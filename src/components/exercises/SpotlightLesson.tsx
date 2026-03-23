@@ -6,6 +6,7 @@ import type { SpotlightModule } from '../../types';
 import { InteractiveText, lookupWord as lookupWordFn } from '../common/WordCard';
 import { shuffle } from '../../content/phonicsLessons';
 import { useWordStore } from '../../store/useWordStore';
+import AIErrorHelper from '../ai/AIErrorHelper';
 
 type Phase = 'learn_words' | 'quiz_words' | 'spell_words' | 'read_sentences' | 'grammar' | 'test' | 'results';
 
@@ -32,6 +33,7 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
   const [correctAnswer, setCorrectAnswer] = useState<string>('');
   const [spellInput, setSpellInput] = useState('');
   const [currentOptions, setCurrentOptions] = useState<string[]>([]);
+  const [showAIHelper, setShowAIHelper] = useState<{ word: string; correct: string; wrong: string; type: 'translation' | 'spelling' | 'grammar' } | null>(null);
   // Queues that grow when mistakes are made
   const [quizQueue, setQuizQueue] = useState<typeof module.words>([]);
   const [spellQueue, setSpellQueue] = useState<typeof module.words>([]);
@@ -157,14 +159,15 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
       const isCorrect = answer === correctAnswer;
       setSelectedAnswer(answer);
       setFeedback(isCorrect ? 'correct' : 'wrong');
+      setShowAIHelper(null);
       if (isCorrect) {
         setScores(s => ({ ...s, quiz: s.quiz + 1 }));
       } else {
-        // Add wrong word to end of queue for retry
         setQuizQueue(q => [...q, w]);
+        setShowAIHelper({ word: w.word, correct: correctAnswer, wrong: answer, type: 'translation' });
       }
       speakWord(w.word);
-      goNext();
+      goNext(2500); // more time to see AI helper
     };
 
     return (
@@ -187,6 +190,9 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
             })}
           </div>
           {feedback && <p className={`mt-4 text-xl font-bold ${feedback === 'correct' ? 'text-success' : 'text-error'}`}>{feedback === 'correct' ? 'Верно!' : `Правильно: ${correctAnswer}`}</p>}
+          {feedback === 'wrong' && showAIHelper && (
+            <AIErrorHelper word={showAIHelper.word} correctAnswer={showAIHelper.correct} wrongAnswer={showAIHelper.wrong} exerciseType={showAIHelper.type} onClose={() => setShowAIHelper(null)} />
+          )}
         </div>
       </div>
     );

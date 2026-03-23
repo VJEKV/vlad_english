@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Volume2, ChevronRight } from 'lucide-react';
 import { useTTS } from '../hooks/useTTS';
 import { InteractiveText } from '../components/common/WordCard';
+import AIStoryGenerator from '../components/ai/AIStoryGenerator';
 
 interface ReadingText {
   id: string;
@@ -248,6 +249,11 @@ export default function ReadingPage() {
       <div>
         <h2 className="text-3xl font-display text-primary mb-2">Чтение</h2>
         <p className="text-gray-400 mb-6">Читай тексты, нажимай на предложения для озвучки</p>
+
+        {/* AI Story Generator */}
+        <div className="mb-8 p-5 bg-gradient-to-r from-primary/5 to-secondary/5 rounded-2xl">
+          <AIStoryGenerator />
+        </div>
 
         <div className="space-y-3 max-w-lg">
           {TEXTS.map((text, i) => (
