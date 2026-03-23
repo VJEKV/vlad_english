@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: 'Nunito', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: 'Fredoka One', cursive;
+}
+
+/* Word display in exercises */
+.word-display {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  letter-spacing: 4px;
+}
+
+/* Phonics highlight colors */
+.ph-vowel-short { color: #FF6B6B; }
+.ph-vowel-long { color: #6C5CE7; }
+.ph-consonant { color: #00B894; }
+.ph-blend { color: #FDCB6E; }
+.ph-digraph { color: #FD79A8; }
+.ph-silent { color: #B2BEC3; }
