@@ -1,10 +1,10 @@
-import { useCallback, useRef, useEffect, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { useSettingsStore } from '../store/useSettingsStore';
 
 export type TTSSpeed = 'slow' | 'normal' | 'fast';
 
-// Edge TTS rate strings for each speed
-const EDGE_RATES: Record<TTSSpeed, { letter: string; word: string; sentence: string }> = {
+// Rate strings for Electron TTS (edge-tts / OpenAI)
+const TTS_RATES: Record<TTSSpeed, { letter: string; word: string; sentence: string }> = {
   slow:   { letter: '-50%', word: '-40%', sentence: '-25%' },
   normal: { letter: '-20%', word: '-10%', sentence: '+0%' },
   fast:   { letter: '+0%', word: '+10%', sentence: '+20%' },
@@ -17,36 +17,51 @@ const WEB_RATES: Record<TTSSpeed, { letter: number; word: number; sentence: numb
   fast:   { letter: 0.7, word: 0.85, sentence: 1.0 },
 };
 
-// Check if running in Electron with edge-tts support
-function hasEdgeTTS(): boolean {
-  return !!(window.electronAPI?.tts);
-}
-
-// Play mp3 file from path (Electron only)
+// Play mp3 file from absolute path
 function playFile(filePath: string, volume: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    // Convert file path to file:// URL for audio element
-    const url = `file://${filePath}`;
+    // Windows path fix: C:\foo\bar → file:///C:/foo/bar
+    let url = filePath;
+    if (!url.startsWith('file://')) {
+      url = url.replace(/\\/g, '/');
+      if (!url.startsWith('/')) url = '/' + url;
+      url = 'file://' + url;
+    }
+
     const audio = new Audio(url);
     audio.volume = volume;
     audio.onended = () => resolve();
-    audio.onerror = () => reject(new Error('Audio playback failed'));
-    audio.play().catch(reject);
+    audio.onerror = (e) => {
+      console.warn('Audio playback failed for:', url, e);
+      reject(new Error('Audio playback failed'));
+    };
+    audio.play().catch((e) => {
+      console.warn('Audio play() rejected:', e);
+      reject(e);
+    });
   });
 }
 
-// Web Speech API fallback
+// Web Speech API fallback (works without internet)
 function speakWebAPI(text: string, lang: string, rate: number, volume: number): Promise<void> {
   return new Promise((resolve) => {
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang === 'ru' ? 'ru-RU' : 'en-US';
-    u.rate = rate;
-    u.pitch = lang === 'en' ? 1.05 : 1.0;
-    u.volume = volume;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
-    speechSynthesis.speak(u);
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = lang === 'ru' ? 'ru-RU' : 'en-US';
+      u.rate = rate;
+      u.pitch = lang === 'en' ? 1.05 : 1.0;
+      u.volume = volume;
+      u.onend = () => resolve();
+      u.onerror = () => resolve();
+      // Timeout safety — if speech doesn't start in 3s, resolve anyway
+      const timeout = setTimeout(() => resolve(), Math.max(3000, text.length * 200));
+      u.onend = () => { clearTimeout(timeout); resolve(); };
+      u.onerror = () => { clearTimeout(timeout); resolve(); };
+      speechSynthesis.speak(u);
+    } catch {
+      resolve();
+    }
   });
 }
 
@@ -56,32 +71,40 @@ export function useTTS() {
   const volume = useSettingsStore((s) => s.volume);
 
   const stop = useCallback(() => {
-    speechSynthesis.cancel();
+    try { speechSynthesis.cancel(); } catch {}
     speakingRef.current = false;
   }, []);
 
-  // Core speak function — tries edge-tts first, falls back to Web Speech
   const speak = useCallback(async (text: string, lang: 'en' | 'ru', speedKey: 'letter' | 'word' | 'sentence'): Promise<void> => {
+    if (!text || !text.trim()) return;
     if (speakingRef.current) stop();
     speakingRef.current = true;
 
-    try {
-      if (hasEdgeTTS()) {
-        const rate = EDGE_RATES[speed][speedKey];
-        const filePath = await window.electronAPI!.tts.speak(text, lang, rate);
+    // Try 1: Electron TTS (OpenAI or edge-tts via main process)
+    if (window.electronAPI?.tts) {
+      try {
+        const rate = TTS_RATES[speed][speedKey];
+        const filePath = await window.electronAPI.tts.speak(text, lang, rate);
         if (filePath) {
-          await playFile(filePath, volume);
-          speakingRef.current = false;
-          return;
+          try {
+            await playFile(filePath, volume);
+            speakingRef.current = false;
+            return;
+          } catch (playErr) {
+            console.warn('playFile failed, trying Web Speech:', playErr);
+          }
         }
+      } catch (e) {
+        console.warn('Electron TTS failed:', e);
       }
-    } catch (e) {
-      console.warn('Edge TTS failed, falling back to Web Speech:', e);
     }
 
-    // Fallback: Web Speech API
-    const rate = WEB_RATES[speed][speedKey];
-    await speakWebAPI(text, lang, rate, volume);
+    // Try 2: Web Speech API (always available as fallback)
+    try {
+      const rate = WEB_RATES[speed][speedKey];
+      await speakWebAPI(text, lang, rate, volume);
+    } catch {}
+
     speakingRef.current = false;
   }, [stop, speed, volume]);
 

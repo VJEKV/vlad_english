@@ -6,3 +6,4 @@ release/
 *.zip
 *.pdf
 .DS_Store
+test-keys/
