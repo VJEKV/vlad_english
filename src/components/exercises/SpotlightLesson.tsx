@@ -8,6 +8,7 @@ import { shuffle } from '../../content/phonicsLessons';
 import { useWordStore } from '../../store/useWordStore';
 import AIErrorHelper from '../ai/AIErrorHelper';
 import KaraokeText from '../common/KaraokeText';
+import SyllableWord from '../common/SyllableWord';
 
 type Phase = 'learn_words' | 'quiz_words' | 'spell_words' | 'read_sentences' | 'grammar' | 'test' | 'results';
 
@@ -112,15 +113,14 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
           <ProgressBar current={wordIndex + 1} total={lessonWords.length} />
           <AnimatePresence mode="wait">
             <motion.div key={wordIndex} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="flex flex-col items-center">
-              {/* Word Card */}
-              <div className="bg-white rounded-2xl shadow-md p-8 mb-6 w-72 text-center">
-                <span className="text-6xl block mb-4">{info?.emoji || '📝'}</span>
-                <button onClick={() => speakWord(w.word)} className="text-4xl font-bold text-primary word-display mb-2 hover:text-primary/80 block mx-auto">{w.word}</button>
-                <div className="h-px bg-gray-100 my-3" />
-                <p className="text-xl text-gray-600 font-bold">{w.translation}</p>
-                <button onClick={() => speakWord(w.word)} className="mt-4 p-3 rounded-full bg-primary text-white hover:bg-primary/90 mx-auto flex items-center gap-2">
-                  <Volume2 size={20} /> <span className="text-sm font-bold">Послушать</span>
-                </button>
+              {/* Word Card with syllable reading */}
+              <div className="bg-white rounded-2xl shadow-md p-8 mb-6 w-80">
+                <SyllableWord
+                  word={w.word}
+                  translation={w.translation}
+                  emoji={info?.emoji || '📝'}
+                  size="lg"
+                />
               </div>
             </motion.div>
           </AnimatePresence>

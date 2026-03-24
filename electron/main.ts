@@ -123,6 +123,64 @@ function callDeepSeek(messages: any[]): Promise<string> {
   });
 }
 
+// === OpenAI TTS ===
+function getOpenAIKey(): string {
+  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
+  try {
+    const p = path.join(app.getPath('userData'), 'api-keys.json');
+    if (fs.existsSync(p)) {
+      return JSON.parse(fs.readFileSync(p, 'utf-8')).openai || '';
+    }
+  } catch {}
+  return '';
+}
+
+function callOpenAITTS(text: string, voice: string, speed: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'tts-1',
+      input: text,
+      voice: voice,
+      speed: speed,
+      response_format: 'mp3',
+    });
+
+    const options = {
+      hostname: 'api.openai.com',
+      path: '/v1/audio/speech',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getOpenAIKey()}`,
+        'Content-Length': Buffer.byteLength(body),
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        if (res.statusCode === 200) {
+          resolve(buf);
+        } else {
+          try {
+            const err = JSON.parse(buf.toString());
+            reject(new Error(err.error?.message || 'OpenAI TTS error'));
+          } catch {
+            reject(new Error(`HTTP ${res.statusCode}`));
+          }
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error('Timeout')); });
+    req.write(body);
+    req.end();
+  });
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
@@ -177,21 +235,34 @@ app.whenReady().then(() => {
   // === API Key management ===
   const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.json');
 
-  ipcMain.handle('apikey:get', () => {
+  ipcMain.handle('apikey:get', (_event, keyName?: string) => {
     try {
       if (fs.existsSync(apiKeysPath)) {
         const keys = JSON.parse(fs.readFileSync(apiKeysPath, 'utf-8'));
-        // Return masked key for display
-        const key = keys.deepseek || '';
-        return key ? key.slice(0, 6) + '...' + key.slice(-4) : '';
+        if (keyName) {
+          const key = keys[keyName] || '';
+          return key ? key.slice(0, 6) + '...' + key.slice(-4) : '';
+        }
+        // Return all masked keys
+        const result: Record<string, string> = {};
+        for (const [k, v] of Object.entries(keys)) {
+          const val = v as string;
+          result[k] = val ? val.slice(0, 6) + '...' + val.slice(-4) : '';
+        }
+        return result;
       }
     } catch {}
-    return '';
+    return keyName ? '' : {};
   });
 
-  ipcMain.handle('apikey:set', (_event, key: string) => {
+  ipcMain.handle('apikey:set', (_event, keyName: string, keyValue: string) => {
     try {
-      fs.writeFileSync(apiKeysPath, JSON.stringify({ deepseek: key }), 'utf-8');
+      let keys: Record<string, string> = {};
+      if (fs.existsSync(apiKeysPath)) {
+        keys = JSON.parse(fs.readFileSync(apiKeysPath, 'utf-8'));
+      }
+      keys[keyName] = keyValue;
+      fs.writeFileSync(apiKeysPath, JSON.stringify(keys), 'utf-8');
       return true;
     } catch { return false; }
   });
@@ -246,19 +317,38 @@ app.whenReady().then(() => {
     return { used: aiRequestCount, limit: AI_DAILY_LIMIT, left: AI_DAILY_LIMIT - aiRequestCount };
   });
 
-  // === Edge TTS (high quality neural voices) ===
+  // === TTS: OpenAI (priority for EN) + Edge-TTS (fallback + RU) ===
   const audioCacheDir = path.join(app.getPath('userData'), 'tts-cache');
   if (!fs.existsSync(audioCacheDir)) fs.mkdirSync(audioCacheDir, { recursive: true });
 
+  // Speed string to OpenAI speed number: "-40%" → 0.6, "+0%" → 1.0, "+20%" → 1.2
+  function parseSpeed(rate: string): number {
+    const match = rate.match(/([+-]?\d+)/);
+    if (!match) return 1.0;
+    return Math.max(0.25, Math.min(4.0, 1.0 + parseInt(match[1]) / 100));
+  }
+
   ipcMain.handle('tts:speak', async (_event, text: string, lang: string, rate: string) => {
     try {
-      // Cache key from text + lang + rate
-      const key = Buffer.from(`${text}_${lang}_${rate}`).toString('base64url').slice(0, 80);
-      const filePath = path.join(audioCacheDir, `${key}.mp3`);
+      const cacheKey = Buffer.from(`${text}_${lang}_${rate}`).toString('base64url').slice(0, 80);
+      const filePath = path.join(audioCacheDir, `${cacheKey}.mp3`);
 
-      // Return cached if exists
+      // Return cached
       if (fs.existsSync(filePath)) return filePath;
 
+      // Try OpenAI TTS for English (best quality)
+      if (lang === 'en' && getOpenAIKey()) {
+        try {
+          const speed = parseSpeed(rate);
+          const buf = await callOpenAITTS(text, 'nova', speed);
+          fs.writeFileSync(filePath, buf);
+          return filePath;
+        } catch (e) {
+          console.warn('OpenAI TTS failed, falling back to edge-tts:', e);
+        }
+      }
+
+      // Fallback: Edge-TTS (for Russian, or if OpenAI unavailable)
       const voice = lang === 'ru' ? 'ru-RU-SvetlanaNeural' : 'en-US-JennyNeural';
       const tts = new EdgeTTS({
         voice,

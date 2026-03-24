@@ -97,19 +97,19 @@ export default function SettingsPage() {
   );
 }
 
-function AIKeySettings() {
+function APIKeyField({ name, label, placeholder }: { name: string; label: string; placeholder: string }) {
   const [keyInput, setKeyInput] = useState('');
   const [savedKey, setSavedKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    window.electronAPI?.apikey?.get().then((k: string) => setSavedKey(k || ''));
-  }, []);
+    window.electronAPI?.apikey?.get(name).then((k: string) => setSavedKey(k || ''));
+  }, [name]);
 
   const handleSave = async () => {
     if (!keyInput.trim()) return;
-    const ok = await window.electronAPI?.apikey?.set(keyInput.trim());
+    const ok = await window.electronAPI?.apikey?.set(name, keyInput.trim());
     if (ok) {
       setSaved(true);
       setSavedKey(keyInput.slice(0, 6) + '...' + keyInput.slice(-4));
@@ -118,40 +118,42 @@ function AIKeySettings() {
     }
   };
 
-  if (!window.electronAPI?.apikey) return null;
-
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm">
-      <label className="font-bold text-sm text-gray-500 mb-3 flex items-center gap-2">
-        <Key size={16} /> AI Помощник (DeepSeek API)
-      </label>
+    <div className="mb-4">
+      <label className="font-bold text-xs text-gray-500 mb-2 block">{label}</label>
       {savedKey && (
-        <p className="text-sm text-success mb-3 flex items-center gap-1">
-          <Check size={14} /> Ключ установлен: {savedKey}
+        <p className="text-xs text-success mb-2 flex items-center gap-1">
+          <Check size={12} /> {savedKey}
         </p>
       )}
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <input
-            type={showKey ? 'text' : 'password'}
-            value={keyInput}
-            onChange={(e) => setKeyInput(e.target.value)}
-            placeholder="sk-..."
-            className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm outline-none focus:border-primary pr-8"
-          />
+          <input type={showKey ? 'text' : 'password'} value={keyInput} onChange={(e) => setKeyInput(e.target.value)}
+            placeholder={placeholder} className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm outline-none focus:border-primary pr-8" />
           <button onClick={() => setShowKey(!showKey)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
             {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
           </button>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={!keyInput.trim()}
-          className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold disabled:opacity-40"
-        >
-          {saved ? '✓' : 'Сохранить'}
+        <button onClick={handleSave} disabled={!keyInput.trim()}
+          className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold disabled:opacity-40">
+          {saved ? '✓' : 'OK'}
         </button>
       </div>
-      <p className="text-xs text-gray-400 mt-2">Ключ хранится только на этом компьютере</p>
+    </div>
+  );
+}
+
+function AIKeySettings() {
+  if (!window.electronAPI?.apikey) return null;
+
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm">
+      <label className="font-bold text-sm text-gray-500 mb-4 flex items-center gap-2">
+        <Key size={16} /> API Ключи
+      </label>
+      <APIKeyField name="openai" label="OpenAI (озвучка + TTS)" placeholder="sk-proj-..." />
+      <APIKeyField name="deepseek" label="DeepSeek (AI помощник)" placeholder="sk-..." />
+      <p className="text-xs text-gray-400">Ключи хранятся только на этом компьютере</p>
     </div>
   );
 }

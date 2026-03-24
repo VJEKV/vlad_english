@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getLimit: () => ipcRenderer.invoke('ai:getLimit'),
   },
   apikey: {
-    get: () => ipcRenderer.invoke('apikey:get'),
-    set: (key: string) => ipcRenderer.invoke('apikey:set', key),
+    get: (keyName?: string) => ipcRenderer.invoke('apikey:get', keyName),
+    set: (keyName: string, keyValue: string) => ipcRenderer.invoke('apikey:set', keyName, keyValue),
   },
 });
