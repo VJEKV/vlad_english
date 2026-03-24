@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Mic, MicOff, Bot, User, Loader2 } from 'lucide-react';
+import { MessageCircle, X, Send, Mic, MicOff, Bot, User, Loader2, Volume2 } from 'lucide-react';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useWordStore } from '../../store/useWordStore';
+import { useTTS } from '../../hooks/useTTS';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -18,6 +19,7 @@ export default function AIChat() {
   const [requestsLeft, setRequestsLeft] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const { speakRu, speakSentence } = useTTS();
   const grade = useSettingsStore((s) => s.grade) ?? 2;
   const { getWordStats } = useWordStore();
 
@@ -166,6 +168,14 @@ export default function AIChat() {
                       <span className="text-xs opacity-60">{msg.role === 'user' ? 'Ты' : 'AI'}</span>
                     </div>
                     <p className="whitespace-pre-wrap">{msg.content}</p>
+                    {msg.role === 'assistant' && msg.content && !msg.content.startsWith('⚠️') && (
+                      <button
+                        onClick={() => speakRu(msg.content)}
+                        className="mt-1.5 flex items-center gap-1 text-xs opacity-50 hover:opacity-100 transition-opacity"
+                      >
+                        <Volume2 size={11} /> Озвучить
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
