@@ -333,32 +333,38 @@ app.whenReady().then(() => {
       const cacheKey = Buffer.from(`${text}_${lang}_${rate}`).toString('base64url').slice(0, 80);
       const filePath = path.join(audioCacheDir, `${cacheKey}.mp3`);
 
-      // Return cached
-      if (fs.existsSync(filePath)) return filePath;
+      // Generate if not cached
+      if (!fs.existsSync(filePath)) {
+        let generated = false;
 
-      // Try OpenAI TTS for English (best quality)
-      if (lang === 'en' && getOpenAIKey()) {
-        try {
-          const speed = parseSpeed(rate);
-          const buf = await callOpenAITTS(text, 'nova', speed);
-          fs.writeFileSync(filePath, buf);
-          return filePath;
-        } catch (e) {
-          console.warn('OpenAI TTS failed, falling back to edge-tts:', e);
+        // Try OpenAI TTS for English (best quality)
+        if (lang === 'en' && getOpenAIKey()) {
+          try {
+            const speed = parseSpeed(rate);
+            const buf = await callOpenAITTS(text, 'nova', speed);
+            fs.writeFileSync(filePath, buf);
+            generated = true;
+          } catch (e) {
+            console.warn('OpenAI TTS failed, falling back to edge-tts:', e);
+          }
+        }
+
+        // Fallback: Edge-TTS
+        if (!generated) {
+          const voice = lang === 'ru' ? 'ru-RU-SvetlanaNeural' : 'en-US-JennyNeural';
+          const tts = new EdgeTTS({
+            voice,
+            lang: lang === 'ru' ? 'ru-RU' : 'en-US',
+            outputFormat: 'audio-24khz-96kbitrate-mono-mp3',
+            rate: rate || '+0%',
+          });
+          await tts.ttsPromise(text, filePath);
         }
       }
 
-      // Fallback: Edge-TTS (for Russian, or if OpenAI unavailable)
-      const voice = lang === 'ru' ? 'ru-RU-SvetlanaNeural' : 'en-US-JennyNeural';
-      const tts = new EdgeTTS({
-        voice,
-        lang: lang === 'ru' ? 'ru-RU' : 'en-US',
-        outputFormat: 'audio-24khz-96kbitrate-mono-mp3',
-        rate: rate || '+0%',
-      });
-
-      await tts.ttsPromise(text, filePath);
-      return filePath;
+      // Return base64 data URL (works in renderer with contextIsolation)
+      const audioData = fs.readFileSync(filePath);
+      return 'data:audio/mp3;base64,' + audioData.toString('base64');
     } catch (e) {
       console.error('TTS error:', e);
       return null;

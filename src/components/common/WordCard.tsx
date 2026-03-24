@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2 } from 'lucide-react';
 import { useTTS } from '../../hooks/useTTS';
@@ -218,16 +218,28 @@ function lookupWord(word: string): { ru: string; emoji: string } | null {
 export function InteractiveWord({ word, className }: { word: string; className?: string }) {
   const { speakWord } = useTTS();
   const [show, setShow] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const showTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const info = lookupWord(word);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(showTimerRef.current);
+      clearTimeout(hideTimerRef.current);
+    };
+  }, []);
+
   const handleEnter = () => {
-    clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => setShow(true), 600);
+    clearTimeout(hideTimerRef.current);
+    clearTimeout(showTimerRef.current);
+    showTimerRef.current = setTimeout(() => setShow(true), 700);
   };
 
   const handleLeave = () => {
-    timeoutRef.current = setTimeout(() => setShow(false), 150);
+    clearTimeout(showTimerRef.current);
+    clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setShow(false), 100);
   };
 
   const handleClick = (e: React.MouseEvent) => {
@@ -258,7 +270,7 @@ export function InteractiveWord({ word, className }: { word: string; className?:
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 5 }}
             className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-xl shadow-lg border border-gray-100 p-3 min-w-[140px] text-center"
-            onMouseEnter={handleEnter}
+            onMouseEnter={() => { clearTimeout(hideTimerRef.current); clearTimeout(showTimerRef.current); }}
             onMouseLeave={handleLeave}
           >
             <span className="text-3xl block mb-1">{info.emoji}</span>

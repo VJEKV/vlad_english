@@ -17,22 +17,14 @@ const WEB_RATES: Record<TTSSpeed, { letter: number; word: number; sentence: numb
   fast:   { letter: 0.7, word: 0.85, sentence: 1.0 },
 };
 
-// Play mp3 file from absolute path
-function playFile(filePath: string, volume: number): Promise<void> {
+// Play audio from data URL (base64) or file path
+function playAudio(dataUrl: string, volume: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    // Windows path fix: C:\foo\bar → file:///C:/foo/bar
-    let url = filePath;
-    if (!url.startsWith('file://')) {
-      url = url.replace(/\\/g, '/');
-      if (!url.startsWith('/')) url = '/' + url;
-      url = 'file://' + url;
-    }
-
-    const audio = new Audio(url);
+    const audio = new Audio(dataUrl);
     audio.volume = volume;
     audio.onended = () => resolve();
     audio.onerror = (e) => {
-      console.warn('Audio playback failed for:', url, e);
+      console.warn('Audio playback failed:', e);
       reject(new Error('Audio playback failed'));
     };
     audio.play().catch((e) => {
@@ -80,18 +72,18 @@ export function useTTS() {
     if (speakingRef.current) stop();
     speakingRef.current = true;
 
-    // Try 1: Electron TTS (OpenAI or edge-tts via main process)
+    // Try 1: Electron TTS (OpenAI or edge-tts via main process → returns data URL)
     if (window.electronAPI?.tts) {
       try {
         const rate = TTS_RATES[speed][speedKey];
-        const filePath = await window.electronAPI.tts.speak(text, lang, rate);
-        if (filePath) {
+        const dataUrl = await window.electronAPI.tts.speak(text, lang, rate);
+        if (dataUrl) {
           try {
-            await playFile(filePath, volume);
+            await playAudio(dataUrl, volume);
             speakingRef.current = false;
             return;
           } catch (playErr) {
-            console.warn('playFile failed, trying Web Speech:', playErr);
+            console.warn('Audio playback failed, trying Web Speech:', playErr);
           }
         }
       } catch (e) {
