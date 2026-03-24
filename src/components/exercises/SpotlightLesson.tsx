@@ -7,6 +7,7 @@ import { InteractiveText, lookupWord as lookupWordFn } from '../common/WordCard'
 import { shuffle } from '../../content/phonicsLessons';
 import { useWordStore } from '../../store/useWordStore';
 import AIErrorHelper from '../ai/AIErrorHelper';
+import KaraokeText from '../common/KaraokeText';
 
 type Phase = 'learn_words' | 'quiz_words' | 'spell_words' | 'read_sentences' | 'grammar' | 'test' | 'results';
 
@@ -258,28 +259,20 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
                       className="flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-lg text-sm font-bold hover:bg-primary/20"><Volume2 size={14} /> Послушать</button>
                   </div>
                   <p className="text-xs text-gray-400 mb-3">{t.titleRu}</p>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {t.lines.map((line, li) => (
-                      <div key={li} className="flex items-start gap-2">
-                        <button onClick={() => speakSentence(line)} className="shrink-0 mt-1 text-gray-300 hover:text-primary"><Volume2 size={14} /></button>
-                        <p className="text-lg leading-relaxed"><InteractiveText text={line} /></p>
-                      </div>
+                      <KaraokeText key={li} sentence={line} />
                     ))}
                   </div>
                 </div>
               ))}
             </div>
           )}
-          <h3 className="text-2xl font-bold mb-4">Ключевые предложения</h3>
+          <h3 className="text-2xl font-bold mb-2">Ключевые предложения</h3>
+          <p className="text-sm text-gray-400 mb-4">Нажми "Читать по словам" — каждое слово подсветится и озвучится</p>
           <div className="space-y-3">
             {module.sentences.map((s, i) => (
-              <div key={i} className="p-4 bg-white rounded-xl shadow-sm hover:shadow-md">
-                <div className="flex items-start gap-2">
-                  <button onClick={() => speakSentence(s.sentence)} className="shrink-0 mt-1 text-gray-300 hover:text-primary"><Volume2 size={16} /></button>
-                  <p className="text-lg font-medium"><InteractiveText text={s.sentence} /></p>
-                </div>
-                <p className="text-sm text-gray-400 mt-1 ml-6">{s.translation}</p>
-              </div>
+              <KaraokeText key={i} sentence={s.sentence} translation={s.translation} />
             ))}
           </div>
           <button onClick={() => setPhase('grammar')} className="mt-6 px-8 py-3 bg-success text-white rounded-xl font-bold text-lg w-full">Дальше — Грамматика</button>
