@@ -4,10 +4,13 @@ import { getAgeGroup } from '../types';
 
 export type TTSSpeed = 'slow' | 'normal' | 'fast';
 
+export type SyllableDelay = 400 | 600 | 800 | 1000;
+
 interface SettingsState {
   volume: number;
   musicVolume: number;
   ttsSpeed: TTSSpeed;
+  syllableDelay: SyllableDelay;
   theme: 'auto' | 'playful' | 'modern' | 'minimal';
   grade: Grade | null;
   ageGroup: AgeGroup;
@@ -15,6 +18,7 @@ interface SettingsState {
 
   setVolume: (v: number) => void;
   setTTSSpeed: (s: TTSSpeed) => void;
+  setSyllableDelay: (d: SyllableDelay) => void;
   setGrade: (g: Grade) => void;
   init: () => Promise<void>;
 }
@@ -23,6 +27,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   volume: 0.7,
   musicVolume: 0.3,
   ttsSpeed: 'slow' as TTSSpeed,
+  syllableDelay: 600 as SyllableDelay,
   theme: 'auto',
   grade: null,
   ageGroup: 'junior',
@@ -36,6 +41,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setTTSSpeed: (s) => {
     set({ ttsSpeed: s });
     window.electronAPI?.store.set('settings.ttsSpeed', s);
+  },
+
+  setSyllableDelay: (d) => {
+    set({ syllableDelay: d });
+    window.electronAPI?.store.set('settings.syllableDelay', d);
   },
 
   setGrade: (g) => {

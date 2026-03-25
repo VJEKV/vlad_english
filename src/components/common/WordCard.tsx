@@ -114,6 +114,11 @@ const WORD_DICT: Record<string, { ru: string; emoji: string }> = {
   old: { ru: 'старый', emoji: '👴' }, new: { ru: 'новый', emoji: '✨' }, hot: { ru: 'горячий', emoji: '🔥' },
   cold: { ru: 'холодный', emoji: '🥶' }, beautiful: { ru: 'красивый', emoji: '🌺' }, cute: { ru: 'милый', emoji: '🥰' },
   brave: { ru: 'смелый', emoji: '🦸' }, scary: { ru: 'страшный', emoji: '😨' }, friendly: { ru: 'дружелюбный', emoji: '🤝' },
+  fat: { ru: 'толстый', emoji: '🐷' }, thin: { ru: 'худой', emoji: '🦒' }, fast: { ru: 'быстрый', emoji: '⚡' },
+  slow: { ru: 'медленный', emoji: '🐌' }, young: { ru: 'молодой', emoji: '👶' }, kind: { ru: 'добрый', emoji: '💝' },
+  food: { ru: 'еда', emoji: '🍽️' }, favourite: { ru: 'любимый', emoji: '⭐' }, favorite: { ru: 'любимый', emoji: '⭐' },
+  sorry: { ru: 'извини', emoji: '🙏' }, dear: { ru: 'дорогой', emoji: '💕' }, matter: { ru: 'дело/проблема', emoji: '❓' },
+  wearing: { ru: 'одет в', emoji: '👕' }, lots: { ru: 'много', emoji: '📦' }, great: { ru: 'отличный', emoji: '👍' },
   nice: { ru: 'приятный', emoji: '👌' }, great: { ru: 'отличный', emoji: '👍' }, lovely: { ru: 'прекрасный', emoji: '💕' },
   dark: { ru: 'тёмный', emoji: '🌑' }, fair: { ru: 'светлый', emoji: '🌕' },
   long: { ru: 'длинный', emoji: '📏' }, little: { ru: 'маленький', emoji: '🤏' },
@@ -246,6 +251,9 @@ export function InteractiveWord({ word, className }: { word: string; className?:
     e.stopPropagation();
     e.preventDefault();
     speakWord(word.replace(/[.,!?;:'"()]/g, ''));
+    setShow(true); // show card on click too
+    clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setShow(false), 3000); // auto-hide after 3s
   };
 
   return (
@@ -273,15 +281,9 @@ export function InteractiveWord({ word, className }: { word: string; className?:
             onMouseEnter={() => { clearTimeout(hideTimerRef.current); clearTimeout(showTimerRef.current); }}
             onMouseLeave={handleLeave}
           >
-            <span className="text-3xl block mb-1">{info.emoji}</span>
-            <p className="font-bold text-sm text-gray-800">{word.replace(/[.,!?]/g, '')}</p>
-            <p className="text-xs text-gray-500">{info.ru}</p>
-            <button
-              onClick={handleClick}
-              className="mt-1 p-1 rounded-full text-primary hover:bg-primary/10 transition-colors"
-            >
-              <Volume2 size={14} />
-            </button>
+            <span className="text-4xl block mb-1">{info.emoji}</span>
+            <p className="font-bold text-base text-gray-800">{word.replace(/[.,!?]/g, '')}</p>
+            <p className="text-sm text-gray-600 font-medium">{info.ru}</p>
             {/* Arrow */}
             <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-white" />
           </motion.div>

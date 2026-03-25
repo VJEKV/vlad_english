@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSettingsStore } from '../store/useSettingsStore';
 import type { Grade } from '../types';
-import type { TTSSpeed } from '../store/useSettingsStore';
+import type { TTSSpeed, SyllableDelay } from '../store/useSettingsStore';
 import { useTTS } from '../hooks/useTTS';
 import { Key, Eye, EyeOff, Check } from 'lucide-react';
 
@@ -13,8 +13,15 @@ const SPEED_OPTIONS: { value: TTSSpeed; label: string; desc: string }[] = [
   { value: 'fast', label: 'Быстро', desc: 'Естественная скорость речи' },
 ];
 
+const SYLLABLE_DELAYS: { value: SyllableDelay; label: string }[] = [
+  { value: 400, label: 'Быстро (0.4с)' },
+  { value: 600, label: 'Нормально (0.6с)' },
+  { value: 800, label: 'Медленно (0.8с)' },
+  { value: 1000, label: 'Очень медленно (1с)' },
+];
+
 export default function SettingsPage() {
-  const { grade, volume, ttsSpeed, setGrade, setVolume, setTTSSpeed } = useSettingsStore();
+  const { grade, volume, ttsSpeed, syllableDelay, setGrade, setVolume, setTTSSpeed, setSyllableDelay } = useSettingsStore();
   const { speakWord, speakSentence } = useTTS();
 
   return (
@@ -67,6 +74,29 @@ export default function SettingsPage() {
           <div className="flex gap-2 mt-3">
             <button onClick={() => speakWord('beautiful')} className="text-sm text-primary hover:underline">Тест: слово</button>
             <button onClick={() => speakSentence('The cat is sitting on the mat.')} className="text-sm text-primary hover:underline">Тест: предложение</button>
+          </div>
+        </div>
+
+        {/* Syllable delay */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <label className="font-bold text-sm text-gray-500 mb-3 block">Задержка между слогами</label>
+          <div className="flex gap-2">
+            {SYLLABLE_DELAYS.map((opt) => (
+              <button key={opt.value} onClick={() => setSyllableDelay(opt.value)}
+                className={`flex-1 p-2 rounded-xl text-xs font-bold transition-colors ${
+                  syllableDelay === opt.value ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}>{opt.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* TTS Test */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <label className="font-bold text-sm text-gray-500 mb-3 block">Тест озвучки</label>
+          <div className="flex gap-2">
+            <button onClick={() => speakWord('beautiful')} className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-bold hover:bg-primary/20">Слово</button>
+            <button onClick={() => speakSentence('The cat is sitting on the table.')} className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-bold hover:bg-primary/20">Предложение</button>
+            <TTSTestButton />
           </div>
         </div>
 
@@ -139,6 +169,42 @@ function APIKeyField({ name, label, placeholder }: { name: string; label: string
           {saved ? '✓' : 'OK'}
         </button>
       </div>
+    </div>
+  );
+}
+
+function TTSTestButton() {
+  const [result, setResult] = useState<string>('');
+  const [testing, setTesting] = useState(false);
+
+  const runTest = async () => {
+    setTesting(true);
+    setResult('Проверяю...');
+    try {
+      const r = await window.electronAPI?.tts?.test();
+      if (r) {
+        const parts = [];
+        if (r.openai) parts.push('OpenAI Nova ✅');
+        else parts.push('OpenAI ❌');
+        if (r.edgeTTS) parts.push('Edge-TTS ✅');
+        else parts.push('Edge-TTS ❌');
+        setResult(parts.join(' | '));
+      } else {
+        setResult('Web Speech API only');
+      }
+    } catch {
+      setResult('Ошибка теста');
+    }
+    setTesting(false);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={runTest} disabled={testing}
+        className="px-4 py-2 bg-warning/10 text-warning rounded-xl text-xs font-bold hover:bg-warning/20 disabled:opacity-50">
+        {testing ? '...' : 'Тест движков'}
+      </button>
+      {result && <span className="text-xs text-gray-500">{result}</span>}
     </div>
   );
 }

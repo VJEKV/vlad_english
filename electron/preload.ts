@@ -8,7 +8,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   tts: {
     speak: (text: string, lang: string, rate: string) => ipcRenderer.invoke('tts:speak', text, lang, rate),
+    pregenerate: (words: string[], lang: string) => ipcRenderer.invoke('tts:pregenerate', words, lang),
+    test: () => ipcRenderer.invoke('tts:test'),
     clearCache: () => ipcRenderer.invoke('tts:clearCache'),
+    onProgress: (callback: (data: any) => void) => {
+      ipcRenderer.on('tts:progress', (_e, data) => callback(data));
+    },
   },
   ai: {
     chat: (messages: any[], context: string) => ipcRenderer.invoke('ai:chat', messages, context),

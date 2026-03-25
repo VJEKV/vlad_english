@@ -3,57 +3,37 @@ import { useSettingsStore } from '../store/useSettingsStore';
 
 export type TTSSpeed = 'slow' | 'normal' | 'fast';
 
-// Rate strings for Electron TTS (edge-tts / OpenAI)
-const TTS_RATES: Record<TTSSpeed, { letter: string; word: string; sentence: string }> = {
-  slow:   { letter: '-50%', word: '-40%', sentence: '-25%' },
-  normal: { letter: '-20%', word: '-10%', sentence: '+0%' },
-  fast:   { letter: '+0%', word: '+10%', sentence: '+20%' },
+const RATES: Record<TTSSpeed, { letter: string; word: string; sentence: string }> = {
+  slow:   { letter: '-50%', word: '-30%', sentence: '-15%' },
+  normal: { letter: '-20%', word: '+0%',  sentence: '+0%' },
+  fast:   { letter: '+0%',  word: '+15%', sentence: '+20%' },
 };
 
-// Web Speech API fallback rates
-const WEB_RATES: Record<TTSSpeed, { letter: number; word: number; sentence: number }> = {
-  slow:   { letter: 0.3, word: 0.45, sentence: 0.6 },
-  normal: { letter: 0.5, word: 0.65, sentence: 0.8 },
-  fast:   { letter: 0.7, word: 0.85, sentence: 1.0 },
-};
-
-// Play audio from data URL (base64) or file path
-function playAudio(dataUrl: string, volume: number): Promise<void> {
+// Play base64 data URL audio
+function playDataUrl(dataUrl: string, volume: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const audio = new Audio(dataUrl);
     audio.volume = volume;
     audio.onended = () => resolve();
-    audio.onerror = (e) => {
-      console.warn('Audio playback failed:', e);
-      reject(new Error('Audio playback failed'));
-    };
-    audio.play().catch((e) => {
-      console.warn('Audio play() rejected:', e);
-      reject(e);
-    });
+    audio.onerror = () => reject(new Error('playback error'));
+    audio.play().catch(reject);
   });
 }
 
-// Web Speech API fallback (works without internet)
-function speakWebAPI(text: string, lang: string, rate: number, volume: number): Promise<void> {
+// Web Speech API — last resort fallback (works offline, sounds robotic)
+function webSpeech(text: string, lang: string, rate: number, vol: number): Promise<void> {
   return new Promise((resolve) => {
     try {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = lang === 'ru' ? 'ru-RU' : 'en-US';
       u.rate = rate;
-      u.pitch = lang === 'en' ? 1.05 : 1.0;
-      u.volume = volume;
-      u.onend = () => resolve();
-      u.onerror = () => resolve();
-      // Timeout safety — if speech doesn't start in 3s, resolve anyway
-      const timeout = setTimeout(() => resolve(), Math.max(3000, text.length * 200));
-      u.onend = () => { clearTimeout(timeout); resolve(); };
-      u.onerror = () => { clearTimeout(timeout); resolve(); };
+      u.volume = vol;
+      const t = setTimeout(() => resolve(), Math.max(2000, text.length * 150));
+      u.onend = () => { clearTimeout(t); resolve(); };
+      u.onerror = () => { clearTimeout(t); resolve(); };
       speechSynthesis.speak(u);
-    } catch {
-      resolve();
-    }
+    } catch { resolve(); }
   });
 }
 
@@ -67,67 +47,47 @@ export function useTTS() {
     speakingRef.current = false;
   }, []);
 
-  const speak = useCallback(async (text: string, lang: 'en' | 'ru', speedKey: 'letter' | 'word' | 'sentence'): Promise<void> => {
-    if (!text || !text.trim()) return;
+  // Main speak function: Electron TTS → Web Speech fallback
+  const speak = useCallback(async (text: string, lang: 'en' | 'ru', rateKey: 'letter' | 'word' | 'sentence'): Promise<void> => {
+    if (!text?.trim()) return;
     if (speakingRef.current) stop();
     speakingRef.current = true;
 
-    // Try 1: Electron TTS (OpenAI or edge-tts via main process → returns data URL)
+    const rate = RATES[speed][rateKey];
+
+    // Try Electron TTS (OpenAI Nova / Edge-TTS → base64 data URL)
     if (window.electronAPI?.tts) {
       try {
-        const rate = TTS_RATES[speed][speedKey];
         const dataUrl = await window.electronAPI.tts.speak(text, lang, rate);
         if (dataUrl) {
-          try {
-            await playAudio(dataUrl, volume);
-            speakingRef.current = false;
-            return;
-          } catch (playErr) {
-            console.warn('Audio playback failed, trying Web Speech:', playErr);
-          }
+          await playDataUrl(dataUrl, volume);
+          speakingRef.current = false;
+          return;
         }
       } catch (e) {
-        console.warn('Electron TTS failed:', e);
+        console.warn('[TTS] Electron failed:', e);
       }
     }
 
-    // Try 2: Web Speech API (always available as fallback)
-    try {
-      const rate = WEB_RATES[speed][speedKey];
-      await speakWebAPI(text, lang, rate, volume);
-    } catch {}
-
+    // Fallback: Web Speech API
+    const webRate = rateKey === 'letter' ? 0.4 : rateKey === 'word' ? 0.6 : 0.8;
+    await webSpeech(text, lang, webRate, volume);
     speakingRef.current = false;
   }, [stop, speed, volume]);
 
-  const speakLetter = useCallback((letter: string) => speak(letter, 'en', 'letter'), [speak]);
-  const speakWord = useCallback((word: string) => speak(word, 'en', 'word'), [speak]);
-  const speakSentence = useCallback((text: string) => speak(text, 'en', 'sentence'), [speak]);
-  const speakRu = useCallback((text: string) => speak(text, 'ru', 'sentence'), [speak]);
+  const speakLetter = useCallback((l: string) => speak(l, 'en', 'letter'), [speak]);
+  const speakWord = useCallback((w: string) => speak(w, 'en', 'word'), [speak]);
+  const speakSentence = useCallback((s: string) => speak(s, 'en', 'sentence'), [speak]);
+  const speakRu = useCallback((s: string) => speak(s, 'ru', 'sentence'), [speak]);
 
-  // Fast syllable speech — uses Web Speech API directly (no network, instant)
-  const speakSyllable = useCallback((syllable: string): Promise<void> => {
-    return new Promise((resolve) => {
-      try {
-        speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(syllable);
-        u.lang = 'en-US';
-        u.rate = 0.6;
-        u.pitch = 1.0;
-        u.volume = volume;
-        const timeout = setTimeout(() => resolve(), 2000);
-        u.onend = () => { clearTimeout(timeout); resolve(); };
-        u.onerror = () => { clearTimeout(timeout); resolve(); };
-        speechSynthesis.speak(u);
-      } catch { resolve(); }
-    });
-  }, [volume]);
+  // Syllable: same as word but will be cached from pregeneration
+  const speakSyllable = useCallback((s: string) => speak(s, 'en', 'word'), [speak]);
 
   const spellWord = useCallback(async (word: string) => {
     stop();
-    for (const letter of word.toLowerCase()) {
-      if (letter === ' ') continue;
-      await speakLetter(letter);
+    for (const ch of word.toLowerCase()) {
+      if (ch === ' ') continue;
+      await speakLetter(ch);
       await new Promise((r) => setTimeout(r, 500));
     }
     await new Promise((r) => setTimeout(r, 400));

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Volume2 } from 'lucide-react';
 import { useTTS } from '../../hooks/useTTS';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { getSyllables } from '../../content/syllables';
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
 
 export default function SyllableWord({ word, translation, emoji, size = 'md', showButton = true }: Props) {
   const { speakWord, speakSyllable } = useTTS();
+  const syllableDelay = useSettingsStore((s) => s.syllableDelay);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const [playing, setPlaying] = useState(false);
   const [done, setDone] = useState(false);
@@ -30,31 +32,28 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
     setDone(false);
 
     if (isMultiSyllable) {
-      // Syllable by syllable — fast Web Speech API
       for (let i = 0; i < syllables.length; i++) {
         setActiveIndex(i);
         await speakSyllable(syllables[i]);
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, syllableDelay));
       }
-
       setActiveIndex(-1);
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, syllableDelay + 200));
     }
 
-    // Whole word — high quality TTS (OpenAI/edge-tts)
+    // Whole word — high quality
     setActiveIndex(-2);
     await speakWord(cleanWord);
 
     setActiveIndex(-1);
     setPlaying(false);
     setDone(true);
-  }, [syllables, cleanWord, playing, isMultiSyllable, speakWord, speakSyllable]);
+  }, [syllables, cleanWord, playing, isMultiSyllable, speakWord, speakSyllable, syllableDelay]);
 
   return (
     <div className="text-center">
       {emoji && <span className={size === 'lg' ? 'text-6xl' : 'text-4xl'} role="img">{emoji}</span>}
 
-      {/* Syllable display */}
       <div className="flex items-center justify-center gap-1 my-3 flex-wrap">
         {syllables.map((syl, i) => {
           const isActive = activeIndex === i;
@@ -109,7 +108,7 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
             <>
               <Volume2 size={15} />
               {isMultiSyllable
-                ? done ? 'Ещё раз' : 'Читать по слогам'
+                ? done ? 'Ещё раз' : 'По слогам'
                 : done ? 'Ещё раз' : 'Послушать'}
             </>
           )}
