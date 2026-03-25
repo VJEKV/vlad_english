@@ -277,15 +277,15 @@ export function InteractiveWord({ word, className }: { word: string; className?:
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 5 }}
-            className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-xl shadow-lg border border-gray-100 p-3 min-w-[140px] text-center"
+            className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 p-3 min-w-[140px] text-center"
             onMouseEnter={() => { clearTimeout(hideTimerRef.current); clearTimeout(showTimerRef.current); }}
             onMouseLeave={handleLeave}
           >
             <span className="text-4xl block mb-1">{info.emoji}</span>
             <p className="font-bold text-base text-gray-800">{word.replace(/[.,!?]/g, '')}</p>
             <p className="text-sm text-gray-600 font-medium">{info.ru}</p>
-            {/* Arrow */}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-white" />
+            {/* Arrow pointing up */}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[6px] border-transparent border-b-white" />
           </motion.div>
         )}
       </AnimatePresence>

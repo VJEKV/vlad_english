@@ -9,15 +9,23 @@ const RATES: Record<TTSSpeed, { letter: string; word: string; sentence: string }
   fast:   { letter: '+0%',  word: '+15%', sentence: '+20%' },
 };
 
-// Play audio from URL (tts:// custom protocol or data URL)
+// Global audio ref for stopping
+let currentAudio: HTMLAudioElement | null = null;
+
 function playAudioUrl(url: string, volume: number): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
     const audio = new Audio(url);
+    currentAudio = audio;
     audio.volume = volume;
-    audio.onended = () => resolve();
-    audio.onerror = (e) => { console.warn('[TTS] playback error:', url.slice(0, 30), e); reject(new Error('playback error')); };
-    audio.play().catch((e) => { console.warn('[TTS] play() rejected:', e); reject(e); });
+    audio.onended = () => { currentAudio = null; resolve(); };
+    audio.onerror = (e) => { currentAudio = null; reject(new Error('playback error')); };
+    audio.play().catch((e) => { currentAudio = null; reject(e); });
   });
+}
+
+function stopAudio() {
+  if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
 }
 
 // Web Speech API — last resort fallback (works offline, sounds robotic)
@@ -44,6 +52,7 @@ export function useTTS() {
 
   const stop = useCallback(() => {
     try { speechSynthesis.cancel(); } catch {}
+    stopAudio();
     speakingRef.current = false;
   }, []);
 

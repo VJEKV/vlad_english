@@ -278,9 +278,46 @@ export const SYLLABLES: Record<string, string[]> = {
   sleeping: ['sleep', 'ing'],
 };
 
+// Simple algorithmic syllable splitter for unknown words
+function autoSplit(word: string): string[] {
+  if (word.length <= 3) return [word];
+  const vowels = 'aeiouy';
+  const syllables: string[] = [];
+  let current = '';
+  let prevVowel = false;
+
+  for (let i = 0; i < word.length; i++) {
+    const ch = word[i];
+    const isVowel = vowels.includes(ch);
+    current += ch;
+
+    if (isVowel) {
+      prevVowel = true;
+    } else if (prevVowel && current.length >= 2 && i < word.length - 1) {
+      // Split after vowel+consonant if next is consonant+vowel
+      const nextIsVowel = i + 1 < word.length && vowels.includes(word[i + 1]);
+      if (nextIsVowel && current.length >= 2) {
+        syllables.push(current);
+        current = '';
+        prevVowel = false;
+      }
+    }
+  }
+  if (current) syllables.push(current);
+
+  // Merge very short trailing syllables
+  if (syllables.length > 1 && syllables[syllables.length - 1].length === 1) {
+    syllables[syllables.length - 2] += syllables.pop()!;
+  }
+
+  return syllables.length > 0 ? syllables : [word];
+}
+
 export function getSyllables(word: string): string[] {
   const clean = word.toLowerCase().replace(/[.,!?;:'"()]/g, '');
+  if (!clean) return [word];
   if (SYLLABLES[clean]) return SYLLABLES[clean];
-  // Fallback: return whole word as single syllable
+  // Algorithmic fallback for unknown words
+  if (clean.length > 3) return autoSplit(clean);
   return [clean];
 }
