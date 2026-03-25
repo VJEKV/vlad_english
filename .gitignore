@@ -5,5 +5,7 @@ release/
 *.exe
 *.zip
 *.pdf
+*.png
+*.jpg
 .DS_Store
 test-keys/
