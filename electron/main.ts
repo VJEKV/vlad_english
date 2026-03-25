@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net } from 'electron';
+import { pathToFileURL } from 'url';
 import * as path from 'path';
 import * as fs from 'fs';
 import { EdgeTTS } from 'node-edge-tts';
@@ -82,6 +83,11 @@ async function callOpenAITTS(text: string, voice: string, speed: number): Promis
 // ============================================================
 // Window
 // ============================================================
+// Register tts:// protocol to serve cached mp3 files
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'tts', privileges: { bypassCSP: true, stream: true, supportFetchAPI: true } }
+]);
+
 let mainWindow: BrowserWindow | null = null;
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -102,6 +108,17 @@ function createWindow() {
 // App Ready — register all IPC handlers
 // ============================================================
 app.whenReady().then(() => {
+
+  // Register tts:// protocol handler — serves mp3 from cache
+  const cacheDir = path.join(app.getPath('userData'), 'tts-cache');
+  if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+
+  protocol.handle('tts', (request) => {
+    // tts://filename.mp3 → serve from cache directory
+    const filename = decodeURIComponent(request.url.replace('tts://', ''));
+    const filePath = path.join(cacheDir, filename);
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
 
   // --- Store ---
   ipcMain.handle('store:get', (_e, key: string) => { const d = readStore(); return key ? getNestedValue(d, key) : d; });
@@ -149,9 +166,7 @@ app.whenReady().then(() => {
     return { used: aiCount, limit: 100, left: 100 - aiCount };
   });
 
-  // --- TTS: OpenAI (EN) → Edge-TTS (fallback) → returns base64 data URL ---
-  const cacheDir = path.join(app.getPath('userData'), 'tts-cache');
-  if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+  // --- TTS: OpenAI (EN) → Edge-TTS (fallback) → returns tts:// URL ---
 
   function speedToNumber(rate: string): number {
     const m = rate.match(/([+-]?\d+)/); if (!m) return 1.0;
@@ -197,9 +212,8 @@ app.whenReady().then(() => {
         if (!ok) return null;
       }
 
-      // Return base64 data URL
-      const data = fs.readFileSync(mp3Path);
-      return 'data:audio/mp3;base64,' + data.toString('base64');
+      // Return tts:// URL — served by custom protocol handler
+      return `tts://${hash}.mp3`;
     } catch (e) {
       console.error('[TTS] Error:', e);
       return null;

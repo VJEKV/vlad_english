@@ -54,7 +54,8 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
     <div className="text-center">
       {emoji && <span className={size === 'lg' ? 'text-6xl' : 'text-4xl'} role="img">{emoji}</span>}
 
-      <div className="flex items-center justify-center gap-1 my-3 flex-wrap">
+      <div className="flex items-center justify-center gap-1 my-3 flex-wrap cursor-pointer"
+        onClick={() => { if (!playing) speakWord(cleanWord); }}>
         {syllables.map((syl, i) => {
           const isActive = activeIndex === i;
           const isAllGreen = activeIndex === -2;

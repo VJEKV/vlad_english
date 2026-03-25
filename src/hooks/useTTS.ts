@@ -9,14 +9,14 @@ const RATES: Record<TTSSpeed, { letter: string; word: string; sentence: string }
   fast:   { letter: '+0%',  word: '+15%', sentence: '+20%' },
 };
 
-// Play base64 data URL audio
-function playDataUrl(dataUrl: string, volume: number): Promise<void> {
+// Play audio from URL (tts:// custom protocol or data URL)
+function playAudioUrl(url: string, volume: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const audio = new Audio(dataUrl);
+    const audio = new Audio(url);
     audio.volume = volume;
     audio.onended = () => resolve();
-    audio.onerror = () => reject(new Error('playback error'));
-    audio.play().catch(reject);
+    audio.onerror = (e) => { console.warn('[TTS] playback error:', url.slice(0, 30), e); reject(new Error('playback error')); };
+    audio.play().catch((e) => { console.warn('[TTS] play() rejected:', e); reject(e); });
   });
 }
 
@@ -58,9 +58,9 @@ export function useTTS() {
     // Try Electron TTS (OpenAI Nova / Edge-TTS → base64 data URL)
     if (window.electronAPI?.tts) {
       try {
-        const dataUrl = await window.electronAPI.tts.speak(text, lang, rate);
-        if (dataUrl) {
-          await playDataUrl(dataUrl, volume);
+        const audioUrl = await window.electronAPI.tts.speak(text, lang, rate);
+        if (audioUrl) {
+          await playAudioUrl(audioUrl, volume);
           speakingRef.current = false;
           return;
         }
