@@ -89,8 +89,7 @@ export function useTTS() {
   const speakSentence = useCallback((s: string) => speak(s, 'en', 'sentence'), [speak]);
   const speakRu = useCallback((s: string) => speak(s, 'ru', 'sentence'), [speak]);
 
-  // Syllable: same as word but will be cached from pregeneration
-  const speakSyllable = useCallback((s: string) => speak(s, 'en', 'word'), [speak]);
+  // speakSyllable removed — syllables are visual only, whole word is spoken
 
   const spellWord = useCallback(async (word: string) => {
     stop();
@@ -103,5 +102,5 @@ export function useTTS() {
     await speakWord(word);
   }, [stop, speakLetter, speakWord]);
 
-  return { speakLetter, speakWord, speakSentence, speakRu, speakSyllable, spellWord, stop, speaking: speakingRef };
+  return { speakLetter, speakWord, speakSentence, speakRu, spellWord, stop, speaking: speakingRef };
 }

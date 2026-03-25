@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Volume2 } from 'lucide-react';
 import { useTTS } from '../../hooks/useTTS';
@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function SyllableWord({ word, translation, emoji, size = 'md', showButton = true }: Props) {
-  const { speakWord, speakSyllable } = useTTS();
+  const { speakWord } = useTTS();
   const syllableDelay = useSettingsStore((s) => s.syllableDelay);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const [playing, setPlaying] = useState(false);
@@ -26,36 +26,48 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
 
   const textSize = size === 'lg' ? 'text-5xl' : size === 'md' ? 'text-3xl' : 'text-xl';
 
+  // Syllable reading: visual highlight step by step + whole word audio
   const playSyllables = useCallback(async () => {
     if (playing) return;
     setPlaying(true);
     setDone(false);
 
     if (isMultiSyllable) {
+      // Step 1: Visual highlight of each syllable (no audio per syllable!)
       for (let i = 0; i < syllables.length; i++) {
         setActiveIndex(i);
-        await speakSyllable(syllables[i]);
         await new Promise(r => setTimeout(r, syllableDelay));
       }
+      // Brief pause after visual walkthrough
       setActiveIndex(-1);
-      await new Promise(r => setTimeout(r, syllableDelay + 200));
+      await new Promise(r => setTimeout(r, 300));
     }
 
-    // Whole word — high quality
+    // Step 2: Whole word — SLOW (quality TTS via OpenAI/edge-tts)
+    setActiveIndex(-2); // all green
+    await speakWord(cleanWord);
+
+    // Step 3: Brief pause then normal speed
+    await new Promise(r => setTimeout(r, 400));
     setActiveIndex(-2);
     await speakWord(cleanWord);
 
     setActiveIndex(-1);
     setPlaying(false);
     setDone(true);
-  }, [syllables, cleanWord, playing, isMultiSyllable, speakWord, speakSyllable, syllableDelay]);
+  }, [syllables, cleanWord, playing, isMultiSyllable, speakWord, syllableDelay]);
+
+  // Click on word = just speak it (no syllable animation)
+  const quickSpeak = useCallback(() => {
+    if (!playing) speakWord(cleanWord);
+  }, [playing, speakWord, cleanWord]);
 
   return (
     <div className="text-center">
       {emoji && <span className={size === 'lg' ? 'text-6xl' : 'text-4xl'} role="img">{emoji}</span>}
 
-      <div className="flex items-center justify-center gap-1 my-3 flex-wrap cursor-pointer"
-        onClick={() => { if (!playing) speakWord(cleanWord); }}>
+      {/* Syllable display — click to hear whole word */}
+      <div className="flex items-center justify-center gap-1 my-3 flex-wrap cursor-pointer" onClick={quickSpeak}>
         {syllables.map((syl, i) => {
           const isActive = activeIndex === i;
           const isAllGreen = activeIndex === -2;
@@ -64,7 +76,7 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
           return (
             <span key={i} className="flex items-center">
               <motion.span
-                animate={isActive ? { scale: 1.25, y: -6 } : { scale: 1, y: 0 }}
+                animate={isActive ? { scale: 1.3, y: -8 } : { scale: 1, y: 0 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 15 }}
                 className={`${textSize} font-bold word-display px-2 py-1 rounded-lg transition-colors duration-300 ${
                   isActive
@@ -88,7 +100,7 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
         <p className={`text-gray-500 ${size === 'lg' ? 'text-xl' : 'text-sm'} mb-3`}>{translation}</p>
       )}
 
-      {showButton && (
+      {showButton && isMultiSyllable && (
         <button
           onClick={playSyllables}
           disabled={playing}
@@ -108,11 +120,16 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
           ) : (
             <>
               <Volume2 size={15} />
-              {isMultiSyllable
-                ? done ? 'Ещё раз' : 'По слогам'
-                : done ? 'Ещё раз' : 'Послушать'}
+              {done ? 'Ещё раз' : 'По слогам'}
             </>
           )}
+        </button>
+      )}
+
+      {showButton && !isMultiSyllable && (
+        <button onClick={quickSpeak}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-primary text-white hover:bg-primary/90">
+          <Volume2 size={15} /> Послушать
         </button>
       )}
     </div>
