@@ -251,6 +251,31 @@ export const SYLLABLES: Record<string, string[]> = {
   alligator: ['al', 'li', 'ga', 'tor'],
   caterpillar: ['cat', 'er', 'pil', 'lar'],
   hippopotamus: ['hip', 'po', 'pot', 'a', 'mus'],
+
+  // ===== COMPOUND WORDS =====
+  teddy: ['ted', 'dy'],
+  nanny: ['nan', 'ny'],
+  chuckles: ['chuck', 'les'],
+  cherry: ['cher', 'ry'],
+  soldier: ['sol', 'dier'],
+  wonderful: ['won', 'der', 'ful'],
+  different: ['dif', 'fer', 'ent'],
+  favourite: ['fav', 'our', 'ite'],
+  favorite: ['fav', 'or', 'ite'],
+  wearing: ['wear', 'ing'],
+  raining: ['rain', 'ing'],
+  playing: ['play', 'ing'],
+  swimming: ['swim', 'ming'],
+  dancing: ['danc', 'ing'],
+  singing: ['sing', 'ing'],
+  running: ['run', 'ning'],
+  jumping: ['jump', 'ing'],
+  climbing: ['climb', 'ing'],
+  reading: ['read', 'ing'],
+  writing: ['writ', 'ing'],
+  cooking: ['cook', 'ing'],
+  eating: ['eat', 'ing'],
+  sleeping: ['sleep', 'ing'],
 };
 
 export function getSyllables(word: string): string[] {

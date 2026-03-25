@@ -9,6 +9,7 @@ import { useWordStore } from '../../store/useWordStore';
 import AIErrorHelper from '../ai/AIErrorHelper';
 import KaraokeText from '../common/KaraokeText';
 import SyllableWord from '../common/SyllableWord';
+import ReadingPhase from './ReadingPhase';
 
 type Phase = 'learn_words' | 'quiz_words' | 'spell_words' | 'read_sentences' | 'grammar' | 'test' | 'results';
 
@@ -240,43 +241,12 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
     );
   }
 
-  // ===== PHASE 4: Read Sentences + Textbook Texts =====
+  // ===== PHASE 4: Read (new AI-powered component) =====
   if (phase === 'read_sentences') {
-    const texts = module.texts || [];
     return (
       <div>
         <Header label={phaseLabels[phase]} onBack={onBack} moduleTitle={module.title} />
-        <div className="max-w-lg mx-auto">
-          {texts.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-2xl font-bold mb-4">Текст учебника</h3>
-              <p className="text-sm text-gray-400 mb-4">Наведи на слово — увидишь перевод и картинку</p>
-              {texts.map((t, ti) => (
-                <div key={ti} className="bg-white rounded-2xl p-6 shadow-sm mb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-bold text-lg text-primary">{t.title}</h4>
-                    <button onClick={async () => { for (const line of t.lines) { await speakSentence(line); await new Promise(r => setTimeout(r, 400)); }}}
-                      className="flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-lg text-sm font-bold hover:bg-primary/20"><Volume2 size={14} /> Послушать</button>
-                  </div>
-                  <p className="text-xs text-gray-400 mb-3">{t.titleRu}</p>
-                  <div className="space-y-3">
-                    {t.lines.map((line, li) => (
-                      <KaraokeText key={li} sentence={line} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <h3 className="text-2xl font-bold mb-2">Ключевые предложения</h3>
-          <p className="text-sm text-gray-400 mb-4">Нажми "Читать по словам" — каждое слово подсветится и озвучится</p>
-          <div className="space-y-3">
-            {module.sentences.map((s, i) => (
-              <KaraokeText key={i} sentence={s.sentence} translation={s.translation} />
-            ))}
-          </div>
-          <button onClick={() => setPhase('grammar')} className="mt-6 px-8 py-3 bg-success text-white rounded-xl font-bold text-lg w-full">Дальше — Грамматика</button>
-        </div>
+        <ReadingPhase module={module} onComplete={() => setPhase('grammar')} />
       </div>
     );
   }
@@ -286,7 +256,7 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
     return (
       <div>
         <Header label={phaseLabels[phase]} onBack={onBack} moduleTitle={module.title} />
-        <div className="max-w-lg mx-auto">
+        <div className="max-w-3xl mx-auto">
           <h3 className="text-2xl font-bold mb-4">Грамматика модуля</h3>
           <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
             <ul className="space-y-3">
