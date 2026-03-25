@@ -105,6 +105,24 @@ export function useTTS() {
   const speakSentence = useCallback((text: string) => speak(text, 'en', 'sentence'), [speak]);
   const speakRu = useCallback((text: string) => speak(text, 'ru', 'sentence'), [speak]);
 
+  // Fast syllable speech — uses Web Speech API directly (no network, instant)
+  const speakSyllable = useCallback((syllable: string): Promise<void> => {
+    return new Promise((resolve) => {
+      try {
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(syllable);
+        u.lang = 'en-US';
+        u.rate = 0.6;
+        u.pitch = 1.0;
+        u.volume = volume;
+        const timeout = setTimeout(() => resolve(), 2000);
+        u.onend = () => { clearTimeout(timeout); resolve(); };
+        u.onerror = () => { clearTimeout(timeout); resolve(); };
+        speechSynthesis.speak(u);
+      } catch { resolve(); }
+    });
+  }, [volume]);
+
   const spellWord = useCallback(async (word: string) => {
     stop();
     for (const letter of word.toLowerCase()) {
@@ -116,5 +134,5 @@ export function useTTS() {
     await speakWord(word);
   }, [stop, speakLetter, speakWord]);
 
-  return { speakLetter, speakWord, speakSentence, speakRu, spellWord, stop, speaking: speakingRef };
+  return { speakLetter, speakWord, speakSentence, speakRu, speakSyllable, spellWord, stop, speaking: speakingRef };
 }

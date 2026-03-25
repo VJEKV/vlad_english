@@ -6,12 +6,11 @@ import { useTTS } from '../../hooks/useTTS';
 interface Props {
   sentence: string;
   translation?: string;
-  autoPlay?: boolean;
   onComplete?: () => void;
 }
 
 export default function KaraokeText({ sentence, translation, onComplete }: Props) {
-  const { speakWord, speakSentence } = useTTS();
+  const { speakSyllable, speakSentence } = useTTS();
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const [playing, setPlaying] = useState(false);
   const [done, setDone] = useState(false);
@@ -23,29 +22,27 @@ export default function KaraokeText({ sentence, translation, onComplete }: Props
     setPlaying(true);
     setDone(false);
 
-    // Word by word with highlight
+    // Word by word — use fast Web Speech for each word
     for (let i = 0; i < words.length; i++) {
       setActiveIndex(i);
       const cleanWord = words[i].replace(/[.,!?;:'"()]/g, '');
       if (cleanWord) {
-        await speakWord(cleanWord);
-        await new Promise(r => setTimeout(r, 300));
+        await speakSyllable(cleanWord);
+        await new Promise(r => setTimeout(r, 400));
       }
     }
 
-    // Pause then full sentence
+    // Pause then full sentence with high quality TTS
     setActiveIndex(-1);
-    await new Promise(r => setTimeout(r, 500));
-
-    // Highlight all for full sentence
-    setActiveIndex(-2); // -2 = all highlighted
+    await new Promise(r => setTimeout(r, 600));
+    setActiveIndex(-2);
     await speakSentence(sentence);
 
     setActiveIndex(-1);
     setPlaying(false);
     setDone(true);
     onComplete?.();
-  }, [words, sentence, speakWord, speakSentence, playing, onComplete]);
+  }, [words, sentence, speakSyllable, speakSentence, playing, onComplete]);
 
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm">
@@ -76,7 +73,7 @@ export default function KaraokeText({ sentence, translation, onComplete }: Props
         })}
       </div>
 
-      {/* Translation */}
+      {/* Translation — always show */}
       {translation && (
         <p className="text-sm text-gray-400 mb-3">{translation}</p>
       )}
@@ -100,7 +97,7 @@ export default function KaraokeText({ sentence, translation, onComplete }: Props
           </>
         ) : done ? (
           <>
-            <Volume2 size={16} /> Послушать ещё раз
+            <Volume2 size={16} /> Ещё раз
           </>
         ) : (
           <>
