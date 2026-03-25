@@ -204,7 +204,7 @@ A: буква`
                     <div className="flex items-start gap-2">
                       {ch && <span className="text-base shrink-0">{ch.icon}</span>}
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm leading-relaxed ${isPlaying ? 'text-success font-bold' : ''}`}>
+                        <p className={`text-2xl leading-relaxed font-medium ${isPlaying ? 'text-success font-bold' : ''}`}>
                           {ch && <span className="font-bold text-gray-400 text-xs mr-1">{ch.name}:</span>}
                           <InteractiveText text={lineText} />
                         </p>
@@ -255,7 +255,7 @@ A: буква`
               {sentences.map((s, i) => (
                 <div key={i} className="px-4 py-2 flex items-start gap-2">
                   <div className="flex-1">
-                    <p className="text-sm"><InteractiveText text={s.sentence} /></p>
+                    <p className="text-xl font-medium"><InteractiveText text={s.sentence} /></p>
                     <p className="text-xs text-gray-400">{s.translation}</p>
                   </div>
                   <button onClick={() => speakSentence(s.sentence)} className="shrink-0 p-1 text-gray-300 hover:text-primary"><Volume2 size={11} /></button>
@@ -355,7 +355,7 @@ A: буква`
     <div className="max-w-md mx-auto">
       <p className="text-xs text-secondary font-bold mb-2">Прочитай вслух {speakIdx + 1}/{maxLines}</p>
       <div className="bg-white rounded-2xl p-5 shadow-sm mb-3">
-        <p className="text-base font-bold mb-2"><InteractiveText text={curText} /></p>
+        <p className="text-2xl font-bold mb-2"><InteractiveText text={curText} /></p>
         <button onClick={() => speakSentence(curText)} className="text-xs text-primary flex items-center gap-1 mb-3"><Volume2 size={11} /> Послушать</button>
         <button onClick={listening ? () => { recRef.current?.stop(); setListening(false); } : startListening}
           className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${listening ? 'bg-error text-white animate-pulse' : 'bg-secondary text-white'}`}>
