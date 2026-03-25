@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Volume2, Square, Play, Mic, MicOff, Bot, Loader2, ChevronRight } from 'lucide-react';
+import { Volume2, Square, Play, Mic, MicOff, Bot, Loader2, ChevronRight, ChevronDown, Eye } from 'lucide-react';
 import { useTTS } from '../../hooks/useTTS';
 import { InteractiveText } from '../common/WordCard';
+import SyllableWord from '../common/SyllableWord';
 import type { SpotlightModule } from '../../types';
 
 const CHAR_ICONS: Record<string, string> = {
@@ -13,233 +14,228 @@ const CHAR_ICONS: Record<string, string> = {
 
 function parseLine(line: string): { icon: string; name: string; text: string } | null {
   for (const [name, icon] of Object.entries(CHAR_ICONS)) {
-    if (line.startsWith(name + ':')) {
-      return { icon, name, text: line.substring(line.indexOf(':') + 1).trim() };
-    }
+    if (line.startsWith(name + ':')) return { icon, name, text: line.substring(line.indexOf(':') + 1).trim() };
   }
   return null;
 }
 
-// Strip emoji and special chars from text before TTS
 function cleanForTTS(text: string): string {
-  return text
-    .replace(/[\u{1F600}-\u{1F6FF}]/gu, '')
-    .replace(/[\u{2600}-\u{27BF}]/gu, '')
-    .replace(/[\u{1F900}-\u{1F9FF}]/gu, '')
-    .replace(/[\u{1FA00}-\u{1FA6F}]/gu, '')
-    .replace(/[\u{2700}-\u{27BF}]/gu, '')
-    .replace(/[*_~`#]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return text.replace(/[\u{1F600}-\u{1FAFF}]/gu, '').replace(/[*_~`#]/g, '').replace(/\s+/g, ' ').trim();
 }
+
+// AI prompt for explaining sentences — pedagogical approach
+const EXPLAIN_PROMPT = `Ты сидишь рядом с ребёнком 8 лет и помогаешь ему читать по-английски.
+Он прочитал предложение и не всё понял. Помоги ему понять СМЫСЛ.
+Скажи "Тут говорится что..." и объясни ситуацию простыми словами.
+Если есть интересное слово — приведи пример из жизни ребёнка.
+Максимум 2 короткие строки. Без терминов. Без грамматики. Без emoji. Без markdown.`;
 
 interface Props {
   module: SpotlightModule;
   onComplete: () => void;
 }
 
-type SubPhase = 'text' | 'ai_questions' | 'speak_aloud';
+type SubPhase = 'text' | 'quiz_after_text' | 'speak_aloud';
 
 export default function ReadingPhase({ module, onComplete }: Props) {
   const { speakSentence, speakRu, stop: stopTTS } = useTTS();
   const [subPhase, setSubPhase] = useState<SubPhase>('text');
-  const [playingIdx, setPlayingIdx] = useState<string>('');
-  const [aiExplanations, setAiExplanations] = useState<Record<string, string>>({});
-  const [aiLoadingKey, setAiLoadingKey] = useState('');
+  const [playingKey, setPlayingKey] = useState('');
   const playingRef = useRef(false);
 
-  // AI Questions state
-  const [aiQuestions, setAiQuestions] = useState<{ q: string; opts: string[]; answer: number }[]>([]);
-  const [qIdx, setQIdx] = useState(0);
-  const [qFeedback, setQFeedback] = useState('');
-  const [qCorrect, setQCorrect] = useState(0);
-  const [qLoading, setQLoading] = useState(false);
+  // AI translations — loaded on mount via DeepSeek
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [translationsLoading, setTranslationsLoading] = useState(false);
+  const [showTranslation, setShowTranslation] = useState<Record<string, boolean>>({});
 
-  // Speak aloud state
-  const [speakLineIdx, setSpeakLineIdx] = useState(0);
+  // AI explanations per line
+  const [explanations, setExplanations] = useState<Record<string, string>>({});
+  const [explainLoading, setExplainLoading] = useState('');
+
+  // Per-text quiz
+  const [quizTextIdx, setQuizTextIdx] = useState(0);
+  const [quizQ, setQuizQ] = useState<{ q: string; opts: string[]; answer: number } | null>(null);
+  const [quizFeedback, setQuizFeedback] = useState('');
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizCorrect, setQuizCorrect] = useState(0);
+  const [quizTotal, setQuizTotal] = useState(0);
+
+  // Speak aloud
+  const [speakIdx, setSpeakIdx] = useState(0);
   const [listening, setListening] = useState(false);
   const [spokenText, setSpokenText] = useState('');
   const [speakFeedback, setSpeakFeedback] = useState('');
   const recRef = useRef<any>(null);
 
+  // Syllable popup
+  const [syllableWord, setSyllableWord] = useState<string | null>(null);
+
   const texts = module.texts || [];
   const sentences = module.sentences;
 
-  // Stop all audio
-  const stopAll = useCallback(() => {
-    stopTTS();
-    playingRef.current = false;
-    setPlayingIdx('');
-  }, [stopTTS]);
+  // Pre-generate translations on mount via AI
+  useEffect(() => {
+    if (!window.electronAPI?.ai || texts.length === 0) return;
+    setTranslationsLoading(true);
+    const allLines = texts.flatMap((t, ti) => t.lines.map((l, li) => ({ key: `${ti}-${li}`, text: parseLine(l)?.text || l })));
+    const batch = allLines.map(l => l.text).join('\n');
 
-  // Play single line
+    window.electronAPI.ai.chat([{
+      role: 'user',
+      content: `Переведи каждую строку на русский. Только перевод, по одному на строку. Без номеров. Без пояснений.\n${batch}`
+    }], '').then(r => {
+      if (r.content) {
+        const lines = r.content.split('\n').filter((l: string) => l.trim());
+        const map: Record<string, string> = {};
+        allLines.forEach((item, i) => { if (lines[i]) map[item.key] = lines[i].trim(); });
+        setTranslations(map);
+      }
+      setTranslationsLoading(false);
+    }).catch(() => setTranslationsLoading(false));
+  }, []);
+
+  const stopAll = useCallback(() => { stopTTS(); playingRef.current = false; setPlayingKey(''); }, [stopTTS]);
+
   const playLine = useCallback(async (text: string, key: string) => {
     if (playingRef.current) { stopAll(); return; }
-    playingRef.current = true;
-    setPlayingIdx(key);
+    playingRef.current = true; setPlayingKey(key);
     await speakSentence(text);
-    playingRef.current = false;
-    setPlayingIdx('');
+    playingRef.current = false; setPlayingKey('');
   }, [speakSentence, stopAll]);
 
-  // Play all lines of a text
   const playAllLines = useCallback(async (lines: string[]) => {
     if (playingRef.current) { stopAll(); return; }
     playingRef.current = true;
     for (let i = 0; i < lines.length; i++) {
       if (!playingRef.current) break;
+      setPlayingKey(`all-${i}`);
       const p = parseLine(lines[i]);
-      setPlayingIdx(`all-${i}`);
       await speakSentence(p ? p.text : lines[i]);
       await new Promise(r => setTimeout(r, 200));
     }
-    playingRef.current = false;
-    setPlayingIdx('');
+    playingRef.current = false; setPlayingKey('');
   }, [speakSentence, stopAll]);
 
-  // AI explain — unique key per line
   const explainLine = async (text: string, key: string) => {
-    if (aiExplanations[key] || !window.electronAPI?.ai) return;
-    setAiLoadingKey(key);
+    if (explanations[key] || !window.electronAPI?.ai) return;
+    setExplainLoading(key);
     try {
-      const result = await window.electronAPI.ai.chat([{
-        role: 'user',
-        content: `Коротко разбери предложение для ребёнка 8 лет: "${text}". Объясни 2-3 ключевых слова. Максимум 2 строки. Без emoji, без звёздочек, без markdown.`
-      }], '');
-      setAiExplanations(prev => ({ ...prev, [key]: result.content || 'Ошибка' }));
-    } catch {
-      setAiExplanations(prev => ({ ...prev, [key]: 'Нет связи с AI.' }));
-    }
-    setAiLoadingKey('');
+      const r = await window.electronAPI.ai.chat([
+        { role: 'system', content: EXPLAIN_PROMPT },
+        { role: 'user', content: `Предложение: "${text}"` }
+      ], '');
+      setExplanations(prev => ({ ...prev, [key]: r.content || 'Ошибка' }));
+    } catch { setExplanations(prev => ({ ...prev, [key]: 'Нет связи.' })); }
+    setExplainLoading('');
   };
 
-  // Generate AI questions
-  const generateQuestions = async () => {
-    if (!window.electronAPI?.ai) { onComplete(); return; }
-    setQLoading(true);
-    const allText = texts.flatMap(t => t.lines).join(' ').slice(0, 400);
-    try {
-      const result = await window.electronAPI.ai.chat([{
-        role: 'user',
-        content: `Текст на английском: "${allText}". Задай 3 простых вопроса на понимание для ребёнка 8 лет. На русском. Без emoji. Формат строго:
-Q1: вопрос
-a) вариант
-b) вариант
-c) вариант
-A1: буква
-
-Q2: вопрос
-a) вариант
-b) вариант
-c) вариант
-A2: буква
-
-Q3: вопрос
-a) вариант
-b) вариант
-c) вариант
-A3: буква`
-      }], '');
-      const qs: typeof aiQuestions = [];
-      const lines = (result.content || '').split('\n');
-      let curQ = '', curOpts: string[] = [];
-      for (const l of lines) {
-        if (l.match(/^Q\d:/)) curQ = l.replace(/^Q\d:\s*/, '');
-        if (l.match(/^[abc]\)/)) curOpts.push(l.replace(/^[abc]\)\s*/, ''));
-        if (l.match(/^A\d:/)) {
-          const a = l.replace(/^A\d:\s*/, '').trim().toLowerCase();
-          if (curQ && curOpts.length === 3) {
-            qs.push({ q: curQ, opts: [...curOpts], answer: a === 'a' ? 0 : a === 'b' ? 1 : 2 });
-          }
-          curQ = ''; curOpts = [];
-        }
-      }
-      setAiQuestions(qs.length > 0 ? qs : [{ q: 'Тебе понравился текст?', opts: ['Да', 'Нет', 'Не понял'], answer: 0 }]);
-    } catch {
-      setAiQuestions([{ q: 'Тебе понравился текст?', opts: ['Да', 'Нет', 'Не понял'], answer: 0 }]);
-    }
-    setQLoading(false);
-    setSubPhase('ai_questions');
-  };
-
-  // Speech recognition
-  const startListening = () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { setSpeakFeedback('Микрофон не поддерживается'); return; }
-    const r = new SR(); r.lang = 'en-US'; r.interimResults = false;
-    r.onresult = (e: any) => { setSpokenText(e.results[0][0].transcript); setListening(false); checkPronunciation(e.results[0][0].transcript); };
-    r.onerror = () => setListening(false);
-    r.onend = () => setListening(false);
-    recRef.current = r; r.start(); setListening(true); setSpokenText(''); setSpeakFeedback('');
-  };
-
-  const allReadLines = [...texts.flatMap(t => t.lines), ...sentences.map(s => s.sentence)];
-
-  const checkPronunciation = async (spoken: string) => {
-    const orig = allReadLines[speakLineIdx] || '';
-    const p = parseLine(orig);
-    const clean = p ? p.text : orig;
-    if (!window.electronAPI?.ai) { setSpeakFeedback(spoken ? 'Хорошая попытка!' : ''); return; }
+  // Generate quiz for a specific text
+  const generateQuiz = async (textIdx: number) => {
+    if (!window.electronAPI?.ai) return;
+    setQuizLoading(true);
+    const t = texts[textIdx];
     try {
       const r = await window.electronAPI.ai.chat([{
         role: 'user',
-        content: `Ребёнок прочитал вслух. Оригинал: "${clean}". Сказал: "${spoken}". Оцени кратко (1-2 предложения). Без emoji, без markdown.`
+        content: `Текст: "${t.lines.join(' ')}". Задай 1 простой вопрос на понимание для ребёнка 8 лет. На русском. Без emoji. Формат:
+Q: вопрос
+a) вариант
+b) вариант
+c) вариант
+A: буква`
       }], '');
-      setSpeakFeedback(r.content || 'Молодец!');
-    } catch { setSpeakFeedback('Хорошая попытка!'); }
+      const lines = (r.content || '').split('\n');
+      let q = '', opts: string[] = [], ans = 0;
+      for (const l of lines) {
+        if (l.startsWith('Q:')) q = l.replace('Q:', '').trim();
+        if (l.match(/^[abc]\)/)) opts.push(l.replace(/^[abc]\)\s*/, ''));
+        if (l.startsWith('A:')) ans = l.replace('A:', '').trim().toLowerCase() === 'a' ? 0 : l.replace('A:', '').trim().toLowerCase() === 'b' ? 1 : 2;
+      }
+      setQuizQ(q && opts.length === 3 ? { q, opts, answer: ans } : null);
+    } catch { setQuizQ(null); }
+    setQuizLoading(false);
+  };
+
+  // Move to next text or finish
+  const nextAfterQuiz = () => {
+    setQuizQ(null); setQuizFeedback('');
+    if (quizTextIdx + 1 < texts.length) {
+      setQuizTextIdx(quizTextIdx + 1);
+      setSubPhase('text');
+    } else {
+      setSubPhase('speak_aloud');
+    }
   };
 
   // ===== TEXT PHASE =====
   if (subPhase === 'text') {
+    const currentText = texts[quizTextIdx];
     return (
       <div className="max-w-3xl mx-auto">
-        {texts.map((t, ti) => (
-          <div key={ti} className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+        {translationsLoading && (
+          <div className="flex items-center gap-2 mb-3 text-xs text-gray-400">
+            <Loader2 size={12} className="animate-spin" /> Готовлю переводы...
+          </div>
+        )}
+
+        {currentText && (
+          <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b">
               <div>
-                <h4 className="font-bold text-sm text-primary">{t.title}</h4>
-                <p className="text-xs text-gray-400">{t.titleRu}</p>
+                <h4 className="font-bold text-sm text-primary">{currentText.title}</h4>
+                <p className="text-xs text-gray-400">{currentText.titleRu}</p>
               </div>
               <div className="flex gap-1.5">
-                <button onClick={() => playAllLines(t.lines)} className="flex items-center gap-1 px-2.5 py-1 bg-primary text-white rounded-lg text-xs font-bold">
-                  {playingIdx.startsWith('all') ? <Square size={11} /> : <Play size={11} />}
-                  {playingIdx.startsWith('all') ? 'Стоп' : 'Все'}
+                <button onClick={() => playAllLines(currentText.lines)} className="flex items-center gap-1 px-2.5 py-1 bg-primary text-white rounded-lg text-xs font-bold">
+                  {playingKey.startsWith('all') ? <><Square size={11} /> Стоп</> : <><Play size={11} /> Все</>}
                 </button>
               </div>
             </div>
             <div className="divide-y divide-gray-50">
-              {t.lines.map((line, li) => {
-                const key = `t${ti}-${li}`;
+              {currentText.lines.map((line, li) => {
+                const key = `${quizTextIdx}-${li}`;
                 const ch = parseLine(line);
-                const isPlaying = playingIdx === key || playingIdx === `all-${li}`;
                 const lineText = ch ? ch.text : line;
+                const isPlaying = playingKey === key || playingKey === `all-${li}`;
+                const tr = translations[key];
 
                 return (
-                  <div key={key} className={`px-4 py-2.5 ${isPlaying ? 'bg-success/5' : ''}`}>
+                  <div key={key} className={`px-4 py-2 ${isPlaying ? 'bg-success/5' : ''}`}>
                     <div className="flex items-start gap-2">
-                      {ch && <span className="text-lg shrink-0">{ch.icon}</span>}
+                      {ch && <span className="text-base shrink-0">{ch.icon}</span>}
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm leading-relaxed ${isPlaying ? 'text-success font-bold' : ''}`}>
-                          {ch && <span className="font-bold text-gray-500 text-xs">{ch.name}: </span>}
+                          {ch && <span className="font-bold text-gray-400 text-xs mr-1">{ch.name}:</span>}
                           <InteractiveText text={lineText} />
                         </p>
+                        {/* Translation — show on click */}
+                        {tr && showTranslation[key] && (
+                          <p className="text-xs text-gray-400 mt-0.5 italic">{tr}</p>
+                        )}
                       </div>
-                      <button onClick={() => isPlaying ? stopAll() : playLine(lineText, key)}
-                        className={`shrink-0 p-1 rounded ${isPlaying ? 'text-error' : 'text-gray-300 hover:text-primary'}`}>
-                        {isPlaying ? <Square size={12} /> : <Volume2 size={12} />}
-                      </button>
-                      {window.electronAPI?.ai && (
-                        <button onClick={() => explainLine(lineText, key)}
-                          className="shrink-0 p-1 rounded text-gray-300 hover:text-primary">
-                          {aiLoadingKey === key ? <Loader2 size={12} className="animate-spin" /> : <Bot size={12} />}
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {tr && (
+                          <button onClick={() => setShowTranslation(p => ({ ...p, [key]: !p[key] }))}
+                            className="p-1 rounded text-gray-300 hover:text-blue-400" title="Перевод">
+                            <Eye size={11} />
+                          </button>
+                        )}
+                        <button onClick={() => isPlaying ? stopAll() : playLine(lineText, key)}
+                          className={`p-1 rounded ${isPlaying ? 'text-error' : 'text-gray-300 hover:text-primary'}`}>
+                          {isPlaying ? <Square size={11} /> : <Volume2 size={11} />}
                         </button>
-                      )}
+                        {window.electronAPI?.ai && (
+                          <button onClick={() => explainLine(lineText, key)}
+                            className="p-1 rounded text-gray-300 hover:text-primary" title="AI объяснит">
+                            {explainLoading === key ? <Loader2 size={11} className="animate-spin" /> : <Bot size={11} />}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    {aiExplanations[key] && (
-                      <div className="ml-7 mt-1.5 bg-blue-50 rounded-lg px-3 py-2">
-                        <p className="text-xs text-gray-600 leading-relaxed">{aiExplanations[key]}</p>
-                        <button onClick={() => speakRu(cleanForTTS(aiExplanations[key]))}
-                          className="text-xs text-primary mt-1 flex items-center gap-0.5">
+                    {explanations[key] && (
+                      <div className="ml-6 mt-1 bg-blue-50 rounded-lg px-3 py-1.5">
+                        <p className="text-xs text-gray-600">{explanations[key]}</p>
+                        <button onClick={() => speakRu(cleanForTTS(explanations[key]))} className="text-xs text-primary mt-0.5 flex items-center gap-0.5">
                           <Volume2 size={9} /> Озвучить
                         </button>
                       </div>
@@ -249,115 +245,133 @@ A3: буква`
               })}
             </div>
           </div>
-        ))}
+        )}
 
-        {sentences.length > 0 && (
+        {/* Key sentences */}
+        {quizTextIdx === texts.length - 1 && sentences.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
-            <div className="px-4 py-2.5 bg-gray-50 border-b">
-              <h4 className="font-bold text-sm text-gray-600">Ключевые предложения</h4>
-            </div>
+            <div className="px-4 py-2 bg-gray-50 border-b"><h4 className="font-bold text-xs text-gray-500">Ключевые предложения</h4></div>
             <div className="divide-y divide-gray-50">
-              {sentences.map((s, i) => {
-                const key = `s-${i}`;
-                return (
-                  <div key={key} className="px-4 py-2.5">
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1">
-                        <p className="text-sm"><InteractiveText text={s.sentence} /></p>
-                        <p className="text-xs text-gray-400">{s.translation}</p>
-                      </div>
-                      <button onClick={() => playLine(s.sentence, key)}
-                        className="shrink-0 p-1 text-gray-300 hover:text-primary">
-                        <Volume2 size={12} />
-                      </button>
-                    </div>
+              {sentences.map((s, i) => (
+                <div key={i} className="px-4 py-2 flex items-start gap-2">
+                  <div className="flex-1">
+                    <p className="text-sm"><InteractiveText text={s.sentence} /></p>
+                    <p className="text-xs text-gray-400">{s.translation}</p>
                   </div>
-                );
-              })}
+                  <button onClick={() => speakSentence(s.sentence)} className="shrink-0 p-1 text-gray-300 hover:text-primary"><Volume2 size={11} /></button>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
+        {/* Syllable popup */}
+        {syllableWord && (
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+            className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+            onClick={() => setSyllableWord(null)}>
+            <div className="bg-white rounded-2xl p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+              <SyllableWord word={syllableWord} size="lg" />
+              <button onClick={() => setSyllableWord(null)} className="mt-4 w-full py-2 bg-gray-100 rounded-xl text-sm font-bold text-gray-500">Закрыть</button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Actions */}
         <div className="flex gap-2">
-          <button onClick={generateQuestions} className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm flex items-center justify-center gap-1.5">
-            <Bot size={15} /> Проверка AI
-          </button>
-          <button onClick={() => setSubPhase('speak_aloud')} className="px-4 py-2.5 bg-secondary text-white rounded-xl font-bold text-sm flex items-center gap-1.5">
-            <Mic size={15} /> Вслух
-          </button>
-          <button onClick={onComplete} className="px-4 py-2.5 bg-gray-100 text-gray-500 rounded-xl font-bold text-sm">
-            Далее →
-          </button>
+          {texts.length > 0 ? (
+            <button onClick={() => { setSubPhase('quiz_after_text'); generateQuiz(quizTextIdx); }}
+              className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm flex items-center justify-center gap-1.5">
+              <Bot size={14} /> Проверка
+            </button>
+          ) : (
+            <button onClick={() => setSubPhase('speak_aloud')}
+              className="flex-1 px-4 py-2.5 bg-secondary text-white rounded-xl font-bold text-sm">
+              <Mic size={14} className="inline mr-1" /> Вслух
+            </button>
+          )}
+          <button onClick={onComplete} className="px-4 py-2.5 bg-gray-100 text-gray-500 rounded-xl font-bold text-sm">Далее →</button>
         </div>
       </div>
     );
   }
 
-  // ===== AI QUESTIONS =====
-  if (subPhase === 'ai_questions') {
-    if (qLoading) return <div className="text-center py-12"><Loader2 size={28} className="animate-spin text-primary mx-auto mb-3" /><p className="text-gray-400 text-sm">AI готовит вопросы...</p></div>;
-    if (qIdx >= aiQuestions.length) return (
-      <div className="max-w-md mx-auto text-center py-8">
-        <p className="text-3xl mb-3">{qCorrect >= 2 ? '🎉' : '💪'}</p>
-        <h3 className="text-xl font-bold mb-4">{qCorrect} из {aiQuestions.length} правильно</h3>
-        <div className="flex gap-2 justify-center">
-          <button onClick={() => setSubPhase('speak_aloud')} className="px-5 py-2.5 bg-secondary text-white rounded-xl font-bold text-sm"><Mic size={14} className="inline mr-1" />Вслух</button>
-          <button onClick={onComplete} className="px-5 py-2.5 bg-primary text-white rounded-xl font-bold text-sm">Далее →</button>
-        </div>
-      </div>
-    );
-    const q = aiQuestions[qIdx];
+  // ===== QUIZ AFTER TEXT =====
+  if (subPhase === 'quiz_after_text') {
+    if (quizLoading) return <div className="text-center py-8"><Loader2 size={24} className="animate-spin text-primary mx-auto mb-2" /><p className="text-xs text-gray-400">AI готовит вопрос...</p></div>;
+    if (!quizQ) { nextAfterQuiz(); return null; }
     return (
       <div className="max-w-md mx-auto">
-        <p className="text-xs text-primary font-bold mb-3">Вопрос {qIdx + 1}/{aiQuestions.length}</p>
+        <p className="text-xs text-primary font-bold mb-2">Проверка после текста {quizTextIdx + 1}</p>
         <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <p className="font-bold mb-3">{q.q}</p>
+          <p className="font-bold text-sm mb-3">{quizQ.q}</p>
           <div className="space-y-2">
-            {q.opts.map((o, i) => (
-              <button key={i} disabled={!!qFeedback} onClick={() => {
-                if (i === q.answer) setQCorrect(c => c + 1);
-                setQFeedback(i === q.answer ? '✅ Верно!' : `❌ Ответ: ${q.opts[q.answer]}`);
-                setTimeout(() => { setQFeedback(''); setQIdx(x => x + 1); }, 1500);
-              }} className={`w-full p-2.5 rounded-xl text-left text-sm font-medium ${
-                qFeedback && i === q.answer ? 'bg-success text-white' : qFeedback ? 'bg-gray-100 text-gray-400' : 'bg-gray-50 hover:bg-primary/10'
+            {quizQ.opts.map((o, i) => (
+              <button key={i} disabled={!!quizFeedback} onClick={() => {
+                const correct = i === quizQ.answer;
+                if (correct) setQuizCorrect(c => c + 1);
+                setQuizTotal(t => t + 1);
+                setQuizFeedback(correct ? 'Верно!' : `Ответ: ${quizQ.opts[quizQ.answer]}`);
+                setTimeout(nextAfterQuiz, 1500);
+              }} className={`w-full p-2 rounded-xl text-left text-sm ${
+                quizFeedback && i === quizQ.answer ? 'bg-success text-white' : quizFeedback ? 'bg-gray-100 text-gray-400' : 'bg-gray-50 hover:bg-primary/10'
               }`}>{String.fromCharCode(97 + i)}) {o}</button>
             ))}
           </div>
-          {qFeedback && <p className="mt-2 text-sm font-bold">{qFeedback}</p>}
+          {quizFeedback && <p className="mt-2 text-sm font-bold">{quizFeedback}</p>}
         </div>
       </div>
     );
   }
 
   // ===== SPEAK ALOUD =====
-  const curLine = allReadLines[speakLineIdx] || '';
+  const allLines = [...texts.flatMap(t => t.lines), ...sentences.map(s => s.sentence)];
+  const curLine = allLines[speakIdx] || '';
   const curParsed = parseLine(curLine);
   const curText = curParsed ? curParsed.text : curLine;
-  const maxLines = Math.min(allReadLines.length, 5);
+  const maxLines = Math.min(allLines.length, 5);
+
+  const startListening = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { setSpeakFeedback('Микрофон не поддерживается'); return; }
+    const r = new SR(); r.lang = 'en-US'; r.interimResults = false;
+    r.onresult = (e: any) => { const t = e.results[0][0].transcript; setSpokenText(t); setListening(false); checkPronunciation(t); };
+    r.onerror = () => setListening(false); r.onend = () => setListening(false);
+    recRef.current = r; r.start(); setListening(true); setSpokenText(''); setSpeakFeedback('');
+  };
+
+  const checkPronunciation = async (spoken: string) => {
+    if (!window.electronAPI?.ai) { setSpeakFeedback('Хорошая попытка!'); return; }
+    try {
+      const r = await window.electronAPI.ai.chat([{
+        role: 'user',
+        content: `Ребёнок прочитал вслух. Оригинал: "${curText}". Сказал: "${spoken}". Оцени кратко 1 предложение. Без emoji. Без markdown.`
+      }], '');
+      setSpeakFeedback(r.content || 'Молодец!');
+    } catch { setSpeakFeedback('Хорошая попытка!'); }
+  };
 
   return (
     <div className="max-w-md mx-auto">
-      <p className="text-xs text-secondary font-bold mb-3">Прочитай вслух {speakLineIdx + 1}/{maxLines}</p>
+      <p className="text-xs text-secondary font-bold mb-2">Прочитай вслух {speakIdx + 1}/{maxLines}</p>
       <div className="bg-white rounded-2xl p-5 shadow-sm mb-3">
         <p className="text-base font-bold mb-2"><InteractiveText text={curText} /></p>
-        <button onClick={() => speakSentence(curText)} className="text-xs text-primary flex items-center gap-1 mb-3">
-          <Volume2 size={11} /> Как правильно
-        </button>
+        <button onClick={() => speakSentence(curText)} className="text-xs text-primary flex items-center gap-1 mb-3"><Volume2 size={11} /> Послушать</button>
         <button onClick={listening ? () => { recRef.current?.stop(); setListening(false); } : startListening}
           className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${listening ? 'bg-error text-white animate-pulse' : 'bg-secondary text-white'}`}>
-          {listening ? <><MicOff size={16} /> Слушаю...</> : <><Mic size={16} /> Нажми и читай</>}
+          {listening ? <><MicOff size={15} /> Слушаю...</> : <><Mic size={15} /> Нажми и читай</>}
         </button>
-        {spokenText && <div className="mt-3 p-2 bg-gray-50 rounded-lg"><p className="text-xs text-gray-400">Услышал:</p><p className="text-sm font-medium">{spokenText}</p></div>}
+        {spokenText && <div className="mt-2 p-2 bg-gray-50 rounded-lg"><p className="text-xs text-gray-400">Услышал:</p><p className="text-sm font-medium">{spokenText}</p></div>}
         {speakFeedback && (
           <div className="mt-2 p-2 bg-blue-50 rounded-lg">
             <p className="text-xs text-gray-600">{speakFeedback}</p>
-            <button onClick={() => speakRu(cleanForTTS(speakFeedback))} className="text-xs text-primary mt-1 flex items-center gap-0.5"><Volume2 size={9} /> Озвучить</button>
+            <button onClick={() => speakRu(cleanForTTS(speakFeedback))} className="text-xs text-primary mt-0.5"><Volume2 size={9} className="inline" /> Озвучить</button>
           </div>
         )}
       </div>
-      {speakLineIdx < maxLines - 1
-        ? <button onClick={() => { setSpeakLineIdx(i => i + 1); setSpokenText(''); setSpeakFeedback(''); }} className="w-full px-4 py-2.5 bg-secondary text-white rounded-xl font-bold text-sm">Следующее →</button>
-        : <button onClick={onComplete} className="w-full px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm">Готово →</button>
+      {speakIdx < maxLines - 1
+        ? <button onClick={() => { setSpeakIdx(i => i + 1); setSpokenText(''); setSpeakFeedback(''); }} className="w-full py-2.5 bg-secondary text-white rounded-xl font-bold text-sm">Следующее →</button>
+        : <button onClick={onComplete} className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm">Готово →</button>
       }
     </div>
   );

@@ -160,15 +160,15 @@ export const SYLLABLES: Record<string, string[]> = {
   happy: ['hap', 'py'],
   funny: ['fun', 'ny'],
   clever: ['clev', 'er'],
-  scary: ['scar', 'y'],
+  scary: ['sca', 'ry'],
   friendly: ['friend', 'ly'],
   little: ['lit', 'tle'],
   sunny: ['sun', 'ny'],
   windy: ['win', 'dy'],
-  rainy: ['rain', 'y'],
+  rainy: ['rai', 'ny'],
   raining: ['rain', 'ing'],
   island: ['is', 'land'],
-  magic: ['mag', 'ic'],
+  magic: ['ma', 'gic'],
   pretty: ['pret', 'ty'],
   lovely: ['love', 'ly'],
   ready: ['read', 'y'],
@@ -185,7 +185,7 @@ export const SYLLABLES: Record<string, string[]> = {
   robot: ['ro', 'bot'],
   puzzle: ['puz', 'zle'],
   guitar: ['gui', 'tar'],
-  piano: ['pi', 'ano'],
+  piano: ['pi', 'an', 'o'],
   sandwich: ['sand', 'wich'],
   apple: ['ap', 'ple'],
   pizza: ['piz', 'za'],
@@ -219,7 +219,7 @@ export const SYLLABLES: Record<string, string[]> = {
   kangaroo: ['kan', 'ga', 'roo'],
   umbrella: ['um', 'brel', 'la'],
   banana: ['ba', 'na', 'na'],
-  chocolate: ['choc', 'o', 'late'],
+  chocolate: ['choc', 'late'],
   butterfly: ['but', 'ter', 'fly'],
   bicycle: ['bi', 'cy', 'cle'],
   beautiful: ['beau', 'ti', 'ful'],
@@ -234,8 +234,8 @@ export const SYLLABLES: Record<string, string[]> = {
   grandfather: ['grand', 'fa', 'ther'],
   family: ['fam', 'i', 'ly'],
   animal: ['an', 'i', 'mal'],
-  favourite: ['fa', 'vour', 'ite'],
-  favorite: ['fa', 'vor', 'ite'],
+  favourite: ['fav', 'our', 'ite'],
+  favorite: ['fav', 'or', 'ite'],
   yesterday: ['yes', 'ter', 'day'],
   basketball: ['bas', 'ket', 'ball'],
   telephone: ['tel', 'e', 'phone'],
@@ -252,18 +252,13 @@ export const SYLLABLES: Record<string, string[]> = {
   caterpillar: ['cat', 'er', 'pil', 'lar'],
   hippopotamus: ['hip', 'po', 'pot', 'a', 'mus'],
 
-  // ===== COMPOUND WORDS =====
+  // ===== OTHER WORDS & -ING FORMS =====
   teddy: ['ted', 'dy'],
-  nanny: ['nan', 'ny'],
   chuckles: ['chuck', 'les'],
   cherry: ['cher', 'ry'],
   soldier: ['sol', 'dier'],
-  wonderful: ['won', 'der', 'ful'],
   different: ['dif', 'fer', 'ent'],
-  favourite: ['fav', 'our', 'ite'],
-  favorite: ['fav', 'or', 'ite'],
   wearing: ['wear', 'ing'],
-  raining: ['rain', 'ing'],
   playing: ['play', 'ing'],
   swimming: ['swim', 'ming'],
   dancing: ['danc', 'ing'],
@@ -276,48 +271,98 @@ export const SYLLABLES: Record<string, string[]> = {
   cooking: ['cook', 'ing'],
   eating: ['eat', 'ing'],
   sleeping: ['sleep', 'ing'],
+
+  // ===== SPOTLIGHT 2-3 ADDITIONS =====
+  // Adjectives
+  terrible: ['ter', 'ri', 'ble'],
+  sorry: ['sor', 'ry'],
+  cloudy: ['clou', 'dy'],
+  snowy: ['sno', 'wy'],
+
+  // Prepositions & adverbs
+  over: ['o', 'ver'],
+  between: ['be', 'tween'],
+  another: ['an', 'oth', 'er'],
+  outside: ['out', 'side'],
+  inside: ['in', 'side'],
+  upstairs: ['up', 'stairs'],
+  downstairs: ['down', 'stairs'],
+  about: ['a', 'bout'],
+  after: ['af', 'ter'],
+  before: ['be', 'fore'],
+  again: ['a', 'gain'],
+  because: ['be', 'cause'],
+  other: ['oth', 'er'],
+  also: ['al', 'so'],
+  only: ['on', 'ly'],
+  very: ['ver', 'y'],
+  really: ['re', 'al', 'ly'],
+  quickly: ['quick', 'ly'],
+  slowly: ['slow', 'ly'],
+  loudly: ['loud', 'ly'],
+  sometimes: ['some', 'times'],
+  always: ['al', 'ways'],
+  usually: ['u', 'su', 'al', 'ly'],
+  never: ['nev', 'er'],
+  often: ['of', 'ten'],
+  everything: ['ev', 'ery', 'thing'],
+
+  // Family
+  mother: ['moth', 'er'],
+  father: ['fa', 'ther'],
+  grandma: ['grand', 'ma'],
+  grandpa: ['grand', 'pa'],
+  cousin: ['cou', 'sin'],
+  uncle: ['un', 'cle'],
+
+  // Days of the week
+  monday: ['Mon', 'day'],
+  tuesday: ['Tues', 'day'],
+  wednesday: ['Wednes', 'day'],
+  thursday: ['Thurs', 'day'],
+  friday: ['Fri', 'day'],
+  saturday: ['Sat', 'ur', 'day'],
+  sunday: ['Sun', 'day'],
+
+  // Time & seasons
+  weather: ['weath', 'er'],
+  springtime: ['spring', 'time'],
+  flower: ['flow', 'er'],
+
+  // School
+  eraser: ['e', 'ra', 'ser'],
+  english: ['Eng', 'lish'],
+  science: ['sci', 'ence'],
+  number: ['num', 'ber'],
+  letter: ['let', 'ter'],
+  colour: ['col', 'our'],
+
+  // Food & party
+  birthday: ['birth', 'day'],
+  balloon: ['bal', 'loon'],
+  candle: ['can', 'dle'],
+  matter: ['mat', 'ter'],
+
+  // Home
+  living: ['liv', 'ing'],
+  cupboard: ['cup', 'board'],
+  wardrobe: ['ward', 'robe'],
+  bookcase: ['book', 'case'],
+  fireplace: ['fire', 'place'],
+  carpet: ['car', 'pet'],
+
+  // Animals
+  tortoise: ['tor', 'toise'],
+  giraffe: ['gi', 'raffe'],
+  dolphin: ['dol', 'phin'],
+  seahorse: ['sea', 'horse'],
+  goldfish: ['gold', 'fish'],
 };
-
-// Simple algorithmic syllable splitter for unknown words
-function autoSplit(word: string): string[] {
-  if (word.length <= 3) return [word];
-  const vowels = 'aeiouy';
-  const syllables: string[] = [];
-  let current = '';
-  let prevVowel = false;
-
-  for (let i = 0; i < word.length; i++) {
-    const ch = word[i];
-    const isVowel = vowels.includes(ch);
-    current += ch;
-
-    if (isVowel) {
-      prevVowel = true;
-    } else if (prevVowel && current.length >= 2 && i < word.length - 1) {
-      // Split after vowel+consonant if next is consonant+vowel
-      const nextIsVowel = i + 1 < word.length && vowels.includes(word[i + 1]);
-      if (nextIsVowel && current.length >= 2) {
-        syllables.push(current);
-        current = '';
-        prevVowel = false;
-      }
-    }
-  }
-  if (current) syllables.push(current);
-
-  // Merge very short trailing syllables
-  if (syllables.length > 1 && syllables[syllables.length - 1].length === 1) {
-    syllables[syllables.length - 2] += syllables.pop()!;
-  }
-
-  return syllables.length > 0 ? syllables : [word];
-}
 
 export function getSyllables(word: string): string[] {
   const clean = word.toLowerCase().replace(/[.,!?;:'"()]/g, '');
   if (!clean) return [word];
   if (SYLLABLES[clean]) return SYLLABLES[clean];
-  // Algorithmic fallback for unknown words
-  if (clean.length > 3) return autoSplit(clean);
+  // No auto-split — unknown words shown as-is (prevents garbage like "s·old·ier")
   return [clean];
 }
