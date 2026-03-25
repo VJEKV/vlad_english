@@ -317,7 +317,7 @@ export default function ReadingPage() {
             >
               <Volume2 size={18} className="text-gray-300 shrink-0 mt-1" />
               <div>
-                <p className="text-xl font-medium leading-relaxed">
+                <p className="text-2xl font-bold leading-relaxed">
                   <InteractiveText text={s.en} />
                 </p>
               </div>

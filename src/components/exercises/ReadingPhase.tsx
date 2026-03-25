@@ -255,7 +255,7 @@ A: буква`
               {sentences.map((s, i) => (
                 <div key={i} className="px-4 py-2 flex items-start gap-2">
                   <div className="flex-1">
-                    <p className="text-xl font-medium"><InteractiveText text={s.sentence} /></p>
+                    <p className="text-2xl font-bold"><InteractiveText text={s.sentence} /></p>
                     <p className="text-xs text-gray-400">{s.translation}</p>
                   </div>
                   <button onClick={() => speakSentence(s.sentence)} className="shrink-0 p-1 text-gray-300 hover:text-primary"><Volume2 size={11} /></button>
