@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Volume2, ChevronRight } from 'lucide-react';
 import { useTTS } from '../hooks/useTTS';
 import { InteractiveText } from '../components/common/WordCard';
+import SyllableText from '../components/common/SyllableText';
 import AIStoryGenerator from '../components/ai/AIStoryGenerator';
 
 interface ReadingText {
@@ -318,7 +319,7 @@ export default function ReadingPage() {
               <Volume2 size={18} className="text-gray-300 shrink-0 mt-1" />
               <div>
                 <p className="text-2xl font-bold leading-relaxed">
-                  <InteractiveText text={s.en} />
+                  <SyllableText text={s.en} />
                 </p>
               </div>
             </button>

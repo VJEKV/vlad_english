@@ -115,7 +115,7 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
           <AnimatePresence mode="wait">
             <motion.div key={wordIndex} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="flex flex-col items-center">
               {/* Word Card with syllable reading */}
-              <div className="bg-white rounded-2xl shadow-md p-8 mb-6 w-80">
+              <div className="bg-white rounded-2xl shadow-md p-8 mb-6 w-full max-w-xl">
                 <SyllableWord
                   word={w.word}
                   translation={w.translation}

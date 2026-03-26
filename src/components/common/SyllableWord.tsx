@@ -106,21 +106,19 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
         <p className={`text-gray-500 ${size === 'lg' ? 'text-xl' : 'text-base'} mb-3`}>{translation}</p>
       )}
 
-      {/* Buttons */}
+      {/* Buttons — ALWAYS show both */}
       {showButton && (
         <div className="flex items-center justify-center gap-2">
-          {isMultiSyllable && (
-            <button onClick={playSyllables} disabled={playing}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
-                playing ? 'bg-success/20 text-success' : 'bg-primary text-white hover:bg-primary/90'
-              }`}>
-              {playing ? (
-                <><div className="w-3 h-3 border-2 border-success border-t-transparent rounded-full animate-spin" /> По слогам...</>
-              ) : (
-                <><BookOpen size={14} /> По слогам</>
-              )}
-            </button>
-          )}
+          <button onClick={playSyllables} disabled={playing}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
+              playing ? 'bg-success/20 text-success' : 'bg-primary text-white hover:bg-primary/90'
+            }`}>
+            {playing ? (
+              <><div className="w-3 h-3 border-2 border-success border-t-transparent rounded-full animate-spin" /> {isMultiSyllable ? 'По слогам...' : 'Медленно...'}</>
+            ) : (
+              <><BookOpen size={14} /> {isMultiSyllable ? 'По слогам' : 'Медленно'}</>
+            )}
+          </button>
           <button onClick={playWhole}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm bg-secondary text-white hover:bg-secondary/90">
             <Volume2 size={14} /> Целиком
