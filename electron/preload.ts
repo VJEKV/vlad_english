@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   tts: {
     speak: (text: string, lang: string, rate: string) => ipcRenderer.invoke('tts:speak', text, lang, rate),
+    speakSyllable: (syllable: string, fullWord: string) => ipcRenderer.invoke('tts:speakSyllable', syllable, fullWord),
     pregenerate: (words: string[], lang: string) => ipcRenderer.invoke('tts:pregenerate', words, lang),
     test: () => ipcRenderer.invoke('tts:test'),
     clearCache: () => ipcRenderer.invoke('tts:clearCache'),

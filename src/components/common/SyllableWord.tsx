@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Volume2 } from 'lucide-react';
+import { Volume2, BookOpen } from 'lucide-react';
 import { useTTS } from '../../hooks/useTTS';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { getSyllables } from '../../content/syllables';
@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function SyllableWord({ word, translation, emoji, size = 'md', showButton = true }: Props) {
-  const { speakWord } = useTTS();
+  const { speakWord, speakSyllable } = useTTS();
   const syllableDelay = useSettingsStore((s) => s.syllableDelay);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const [playing, setPlaying] = useState(false);
@@ -26,48 +26,53 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
 
   const textSize = size === 'lg' ? 'text-5xl' : size === 'md' ? 'text-3xl' : 'text-xl';
 
-  // Syllable reading: visual highlight step by step + whole word audio
+  // Click on individual syllable — pronounce THAT SYLLABLE via gpt-4o-mini-tts
+  const onSyllableClick = useCallback(async (syl: string, idx: number) => {
+    if (playing) return;
+    setActiveIndex(idx);
+    await speakSyllable(syl, cleanWord);
+    setTimeout(() => setActiveIndex(-1), 500);
+  }, [playing, speakSyllable, cleanWord]);
+
+  // "По слогам" — animate through all syllables with audio for each
   const playSyllables = useCallback(async () => {
     if (playing) return;
     setPlaying(true);
     setDone(false);
 
     if (isMultiSyllable) {
-      // Step 1: Visual highlight of each syllable (no audio per syllable!)
       for (let i = 0; i < syllables.length; i++) {
         setActiveIndex(i);
+        await speakSyllable(syllables[i], cleanWord);
         await new Promise(r => setTimeout(r, syllableDelay));
       }
-      // Brief pause after visual walkthrough
       setActiveIndex(-1);
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400));
     }
 
-    // Step 2: Whole word — SLOW (quality TTS via OpenAI/edge-tts)
-    setActiveIndex(-2); // all green
-    await speakWord(cleanWord);
-
-    // Step 3: Brief pause then normal speed
-    await new Promise(r => setTimeout(r, 400));
+    // Whole word
     setActiveIndex(-2);
     await speakWord(cleanWord);
 
     setActiveIndex(-1);
     setPlaying(false);
     setDone(true);
-  }, [syllables, cleanWord, playing, isMultiSyllable, speakWord, syllableDelay]);
+  }, [syllables, cleanWord, playing, isMultiSyllable, speakWord, speakSyllable, syllableDelay]);
 
-  // Click on word = just speak it (no syllable animation)
-  const quickSpeak = useCallback(() => {
-    if (!playing) speakWord(cleanWord);
+  // "Целиком"
+  const playWhole = useCallback(async () => {
+    if (playing) return;
+    setActiveIndex(-2);
+    await speakWord(cleanWord);
+    setActiveIndex(-1);
   }, [playing, speakWord, cleanWord]);
 
   return (
     <div className="text-center">
       {emoji && <span className={size === 'lg' ? 'text-6xl' : 'text-4xl'} role="img">{emoji}</span>}
 
-      {/* Syllable display — click to hear whole word */}
-      <div className="flex items-center justify-center gap-1 my-3 flex-wrap cursor-pointer" onClick={quickSpeak}>
+      {/* Syllables — each clickable */}
+      <div className="flex items-center justify-center gap-1 my-3 flex-wrap">
         {syllables.map((syl, i) => {
           const isActive = activeIndex === i;
           const isAllGreen = activeIndex === -2;
@@ -75,21 +80,22 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
 
           return (
             <span key={i} className="flex items-center">
-              <motion.span
+              <motion.button
+                onClick={() => isMultiSyllable ? onSyllableClick(syl, i) : playWhole()}
                 animate={isActive ? { scale: 1.3, y: -8 } : { scale: 1, y: 0 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                className={`${textSize} font-bold word-display px-2 py-1 rounded-lg transition-colors duration-300 ${
+                className={`${textSize} font-bold word-display px-3 py-1 rounded-lg transition-colors duration-300 cursor-pointer ${
                   isActive
                     ? 'bg-success text-white shadow-lg'
                     : isPast || done
-                    ? 'text-success'
-                    : 'text-gray-700'
+                    ? 'text-success hover:bg-success/10'
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 {syl}
-              </motion.span>
+              </motion.button>
               {i < syllables.length - 1 && (
-                <span className={`${size === 'lg' ? 'text-3xl' : 'text-xl'} text-gray-300 mx-1`}>·</span>
+                <span className={`${size === 'lg' ? 'text-3xl' : 'text-xl'} text-gray-300 mx-0.5`}>·</span>
               )}
             </span>
           );
@@ -97,40 +103,29 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
       </div>
 
       {translation && (
-        <p className={`text-gray-500 ${size === 'lg' ? 'text-xl' : 'text-sm'} mb-3`}>{translation}</p>
+        <p className={`text-gray-500 ${size === 'lg' ? 'text-xl' : 'text-base'} mb-3`}>{translation}</p>
       )}
 
-      {showButton && isMultiSyllable && (
-        <button
-          onClick={playSyllables}
-          disabled={playing}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
-            playing
-              ? 'bg-success/20 text-success'
-              : done
-              ? 'bg-success/10 text-success hover:bg-success/20'
-              : 'bg-primary text-white hover:bg-primary/90'
-          }`}
-        >
-          {playing ? (
-            <>
-              <div className="w-3.5 h-3.5 border-2 border-success border-t-transparent rounded-full animate-spin" />
-              По слогам...
-            </>
-          ) : (
-            <>
-              <Volume2 size={15} />
-              {done ? 'Ещё раз' : 'По слогам'}
-            </>
+      {/* Buttons */}
+      {showButton && (
+        <div className="flex items-center justify-center gap-2">
+          {isMultiSyllable && (
+            <button onClick={playSyllables} disabled={playing}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
+                playing ? 'bg-success/20 text-success' : 'bg-primary text-white hover:bg-primary/90'
+              }`}>
+              {playing ? (
+                <><div className="w-3 h-3 border-2 border-success border-t-transparent rounded-full animate-spin" /> По слогам...</>
+              ) : (
+                <><BookOpen size={14} /> По слогам</>
+              )}
+            </button>
           )}
-        </button>
-      )}
-
-      {showButton && !isMultiSyllable && (
-        <button onClick={quickSpeak}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-primary text-white hover:bg-primary/90">
-          <Volume2 size={15} /> Послушать
-        </button>
+          <button onClick={playWhole}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm bg-secondary text-white hover:bg-secondary/90">
+            <Volume2 size={14} /> Целиком
+          </button>
+        </div>
       )}
     </div>
   );

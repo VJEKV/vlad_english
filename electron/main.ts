@@ -69,10 +69,13 @@ async function callDeepSeek(messages: any[]): Promise<string> {
 // ============================================================
 // OpenAI TTS
 // ============================================================
-async function callOpenAITTS(text: string, voice: string, speed: number): Promise<Buffer> {
+async function callOpenAITTS(text: string, voice: string, speed: number, instructions?: string): Promise<Buffer> {
   const key = getKey('openai');
   if (!key) throw new Error('OpenAI API key not set');
-  const body = JSON.stringify({ model: 'tts-1', input: text, voice, speed, response_format: 'mp3' });
+  const model = instructions ? 'gpt-4o-mini-tts' : 'tts-1';
+  const payload: any = { model, input: text, voice, speed, response_format: 'mp3' };
+  if (instructions) payload.instructions = instructions;
+  const body = JSON.stringify(payload);
   const resp = await httpPost('https://api.openai.com/v1/audio/speech',
     { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body);
   if (resp.status === 200) return resp.data;
@@ -216,6 +219,46 @@ app.whenReady().then(() => {
       return `tts://${hash}.mp3`;
     } catch (e) {
       console.error('[TTS] Error:', e);
+      return null;
+    }
+  });
+
+  // Syllable TTS — pronounce a syllable in context of the full word
+  ipcMain.handle('tts:speakSyllable', async (_e, syllable: string, fullWord: string) => {
+    if (!syllable || !fullWord) return null;
+    try {
+      const hash = Buffer.from(`syl_${syllable}_${fullWord}`).toString('base64url').slice(0, 80);
+      const mp3Path = path.join(cacheDir, `${hash}.mp3`);
+
+      if (!fs.existsSync(mp3Path)) {
+        if (getKey('openai')) {
+          try {
+            const instructions = `Pronounce only the syllable "${syllable}" as part of the word "${fullWord}". Say it slowly, clearly, like a teacher helping a child read. Only say "${syllable}", nothing else.`;
+            const buf = await callOpenAITTS(syllable, 'nova', 0.8, instructions);
+            fs.writeFileSync(mp3Path, buf);
+            console.log('[TTS] Syllable OpenAI:', syllable, 'of', fullWord);
+          } catch (e) {
+            console.warn('[TTS] Syllable OpenAI failed:', (e as Error).message);
+            // Fallback: edge-tts for syllable
+            try {
+              const tts = new EdgeTTS({ voice: 'en-US-JennyNeural', lang: 'en-US',
+                outputFormat: 'audio-24khz-96kbitrate-mono-mp3', rate: '-30%' });
+              await tts.ttsPromise(syllable, mp3Path);
+            } catch { return null; }
+          }
+        } else {
+          // Edge-TTS fallback
+          try {
+            const tts = new EdgeTTS({ voice: 'en-US-JennyNeural', lang: 'en-US',
+              outputFormat: 'audio-24khz-96kbitrate-mono-mp3', rate: '-30%' });
+            await tts.ttsPromise(syllable, mp3Path);
+          } catch { return null; }
+        }
+      }
+
+      return `tts://${hash}.mp3`;
+    } catch (e) {
+      console.error('[TTS] Syllable error:', e);
       return null;
     }
   });

@@ -89,7 +89,27 @@ export function useTTS() {
   const speakSentence = useCallback((s: string) => speak(s, 'en', 'sentence'), [speak]);
   const speakRu = useCallback((s: string) => speak(s, 'ru', 'sentence'), [speak]);
 
-  // speakSyllable removed — syllables are visual only, whole word is spoken
+  // Syllable: pronounce a syllable in context of word via gpt-4o-mini-tts
+  const speakSyllable = useCallback(async (syllable: string, fullWord: string): Promise<void> => {
+    if (!syllable?.trim()) return;
+    if (speakingRef.current) stop();
+    speakingRef.current = true;
+
+    if (window.electronAPI?.tts?.speakSyllable) {
+      try {
+        const url = await window.electronAPI.tts.speakSyllable(syllable, fullWord);
+        if (url) {
+          await playAudioUrl(url, volume);
+          speakingRef.current = false;
+          return;
+        }
+      } catch (e) { console.warn('[TTS] syllable failed:', e); }
+    }
+
+    // Fallback: Web Speech for syllable
+    await webSpeech(syllable, 'en', 0.5, volume);
+    speakingRef.current = false;
+  }, [stop, volume]);
 
   const spellWord = useCallback(async (word: string) => {
     stop();
@@ -102,5 +122,5 @@ export function useTTS() {
     await speakWord(word);
   }, [stop, speakLetter, speakWord]);
 
-  return { speakLetter, speakWord, speakSentence, speakRu, spellWord, stop, speaking: speakingRef };
+  return { speakLetter, speakWord, speakSentence, speakRu, speakSyllable, spellWord, stop, speaking: speakingRef };
 }
