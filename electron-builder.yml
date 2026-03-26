@@ -1,5 +1,5 @@
 appId: com.vlad-english.app
-productName: VladEnglish
+productName: VladEnglish2
 directories:
   output: release
   buildResources: build
@@ -14,12 +14,14 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: build/icon.ico
 
 nsis:
-  oneClick: true
+  oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: VladEnglish
+  installerSidebar: null
+  uninstallDisplayName: VladEnglish
+  deleteAppDataOnUninstall: true
