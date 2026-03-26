@@ -176,9 +176,12 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
       <div>
         <Header label={phaseLabels[phase]} onBack={onBack} moduleTitle={module.title} />
         <div className="flex flex-col items-center">
-          <p className="text-gray-500 mb-2">{round + 1} из {quizQueue.length}</p>
+          <p className="text-gray-500 mb-1">{round + 1} из {quizQueue.length}</p>
+          {quizQueue.length > lessonWords.length && (
+            <p className="text-xs text-warning mb-1">Ошибочные слова вернулись в очередь</p>
+          )}
           <ProgressBar current={round + 1} total={quizQueue.length} color="bg-secondary" />
-          <h3 className="text-2xl font-bold mb-2">Выбери перевод</h3>
+          <h3 className="text-xl font-bold mb-2">Выбери перевод</h3>
           <button onClick={() => speakWord(w.word)} className="text-4xl font-bold text-primary word-display mb-6 hover:text-primary/80">{w.word}</button>
           <div className="flex flex-col gap-3 w-full max-w-sm">
             {currentOptions.map((opt, i) => {

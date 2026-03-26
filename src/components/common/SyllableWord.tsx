@@ -16,29 +16,29 @@ interface Props {
 export default function SyllableWord({ word, translation, emoji, size = 'md', showButton = true }: Props) {
   const { speakWord, speakSyllable } = useTTS();
   const syllableDelay = useSettingsStore((s) => s.syllableDelay);
+  // Default mode: whole word
+  const [mode, setMode] = useState<'whole' | 'syllables'>('whole');
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const [playing, setPlaying] = useState(false);
-  const [done, setDone] = useState(false);
 
   const cleanWord = word.replace(/[.,!?;:'"()]/g, '');
   const syllables = getSyllables(cleanWord);
   const isMultiSyllable = syllables.length > 1;
-
   const textSize = size === 'lg' ? 'text-5xl' : size === 'md' ? 'text-3xl' : 'text-xl';
 
-  // Click on individual syllable — pronounce THAT SYLLABLE via gpt-4o-mini-tts
+  // Click syllable → pronounce that syllable
   const onSyllableClick = useCallback(async (syl: string, idx: number) => {
     if (playing) return;
     setActiveIndex(idx);
     await speakSyllable(syl, cleanWord);
-    setTimeout(() => setActiveIndex(-1), 500);
+    setTimeout(() => setActiveIndex(-1), 400);
   }, [playing, speakSyllable, cleanWord]);
 
-  // "По слогам" — animate through all syllables with audio for each
-  const playSyllables = useCallback(async () => {
+  // "По слогам" button — switch mode + animate + play
+  const handleSyllableMode = useCallback(async () => {
+    setMode('syllables');
     if (playing) return;
     setPlaying(true);
-    setDone(false);
 
     if (isMultiSyllable) {
       for (let i = 0; i < syllables.length; i++) {
@@ -47,80 +47,105 @@ export default function SyllableWord({ word, translation, emoji, size = 'md', sh
         await new Promise(r => setTimeout(r, syllableDelay));
       }
       setActiveIndex(-1);
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 300));
     }
 
-    // Whole word
+    // Whole word at end
     setActiveIndex(-2);
     await speakWord(cleanWord);
-
     setActiveIndex(-1);
     setPlaying(false);
-    setDone(true);
   }, [syllables, cleanWord, playing, isMultiSyllable, speakWord, speakSyllable, syllableDelay]);
 
-  // "Целиком"
-  const playWhole = useCallback(async () => {
+  // "Целиком" button — switch mode + play whole word
+  const handleWholeMode = useCallback(async () => {
+    setMode('whole');
     if (playing) return;
+    setPlaying(true);
     setActiveIndex(-2);
     await speakWord(cleanWord);
     setActiveIndex(-1);
+    setPlaying(false);
   }, [playing, speakWord, cleanWord]);
 
   return (
     <div className="text-center">
       {emoji && <span className={size === 'lg' ? 'text-6xl' : 'text-4xl'} role="img">{emoji}</span>}
 
-      {/* Syllables — each clickable */}
+      {/* Word display — depends on mode */}
       <div className="flex items-center justify-center gap-1 my-3 flex-wrap">
-        {syllables.map((syl, i) => {
-          const isActive = activeIndex === i;
-          const isAllGreen = activeIndex === -2;
-          const isPast = activeIndex > i || isAllGreen;
+        {mode === 'whole' ? (
+          // WHOLE MODE: single word, clickable
+          <motion.button
+            onClick={handleWholeMode}
+            animate={activeIndex === -2 ? { scale: 1.1 } : { scale: 1 }}
+            className={`${textSize} font-bold word-display px-3 py-1 rounded-lg cursor-pointer transition-colors ${
+              activeIndex === -2 ? 'text-success' : 'text-gray-700 hover:text-primary'
+            }`}
+          >
+            {cleanWord}
+          </motion.button>
+        ) : (
+          // SYLLABLE MODE: split with dots, each clickable
+          syllables.map((syl, i) => {
+            const isActive = activeIndex === i;
+            const isAllGreen = activeIndex === -2;
+            const isPast = activeIndex > i || isAllGreen;
 
-          return (
-            <span key={i} className="flex items-center">
-              <motion.button
-                onClick={() => isMultiSyllable ? onSyllableClick(syl, i) : playWhole()}
-                animate={isActive ? { scale: 1.3, y: -8 } : { scale: 1, y: 0 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                className={`${textSize} font-bold word-display px-3 py-1 rounded-lg transition-colors duration-300 cursor-pointer ${
-                  isActive
-                    ? 'bg-success text-white shadow-lg'
-                    : isPast || done
-                    ? 'text-success hover:bg-success/10'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {syl}
-              </motion.button>
-              {i < syllables.length - 1 && (
-                <span className={`${size === 'lg' ? 'text-3xl' : 'text-xl'} text-gray-300 mx-0.5`}>·</span>
-              )}
-            </span>
-          );
-        })}
+            return (
+              <span key={i} className="flex items-center">
+                <motion.button
+                  onClick={() => onSyllableClick(syl, i)}
+                  animate={isActive ? { scale: 1.3, y: -8 } : { scale: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                  className={`${textSize} font-bold word-display px-3 py-1 rounded-lg cursor-pointer transition-colors duration-300 ${
+                    isActive
+                      ? 'bg-success text-white shadow-lg'
+                      : isPast
+                      ? 'text-success'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {syl}
+                </motion.button>
+                {i < syllables.length - 1 && (
+                  <span className={`${size === 'lg' ? 'text-3xl' : 'text-xl'} text-gray-300 mx-0.5`}>·</span>
+                )}
+              </span>
+            );
+          })
+        )}
       </div>
 
       {translation && (
         <p className={`text-gray-500 ${size === 'lg' ? 'text-xl' : 'text-base'} mb-3`}>{translation}</p>
       )}
 
-      {/* Buttons — ALWAYS show both */}
+      {/* Two buttons: По слогам + Целиком */}
       {showButton && (
         <div className="flex items-center justify-center gap-2">
-          <button onClick={playSyllables} disabled={playing}
+          <button onClick={handleSyllableMode} disabled={playing}
             className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
-              playing ? 'bg-success/20 text-success' : 'bg-primary text-white hover:bg-primary/90'
+              mode === 'syllables' && !playing
+                ? 'bg-primary text-white'
+                : playing && mode === 'syllables'
+                ? 'bg-success/20 text-success'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}>
-            {playing ? (
-              <><div className="w-3 h-3 border-2 border-success border-t-transparent rounded-full animate-spin" /> {isMultiSyllable ? 'По слогам...' : 'Медленно...'}</>
+            {playing && mode === 'syllables' ? (
+              <><div className="w-3 h-3 border-2 border-success border-t-transparent rounded-full animate-spin" /> По слогам...</>
             ) : (
-              <><BookOpen size={14} /> {isMultiSyllable ? 'По слогам' : 'Медленно'}</>
+              <><BookOpen size={14} /> По слогам</>
             )}
           </button>
-          <button onClick={playWhole}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm bg-secondary text-white hover:bg-secondary/90">
+          <button onClick={handleWholeMode} disabled={playing}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
+              mode === 'whole' && !playing
+                ? 'bg-secondary text-white'
+                : playing && mode === 'whole'
+                ? 'bg-success/20 text-success'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}>
             <Volume2 size={14} /> Целиком
           </button>
         </div>

@@ -44,6 +44,9 @@ export default function ReadingPhase({ module, onComplete }: Props) {
   const [playingKey, setPlayingKey] = useState('');
   const playingRef = useRef(false);
 
+  // Reading mode toggle
+  const [readMode, setReadMode] = useState<'syllables' | 'whole'>('whole');
+
   // AI translations — loaded on mount via DeepSeek
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [translationsLoading, setTranslationsLoading] = useState(false);
@@ -173,6 +176,19 @@ A: буква`
     const currentText = texts[quizTextIdx];
     return (
       <div className="max-w-3xl mx-auto">
+        {/* Reading mode toggle */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xs text-gray-400 mr-2">Режим:</span>
+          <button onClick={() => setReadMode('syllables')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${readMode === 'syllables' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+            📖 По слогам
+          </button>
+          <button onClick={() => setReadMode('whole')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${readMode === 'whole' ? 'bg-secondary text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+            ▶ Целиком
+          </button>
+        </div>
+
         {translationsLoading && (
           <div className="flex items-center gap-2 mb-3 text-xs text-gray-400">
             <Loader2 size={12} className="animate-spin" /> Готовлю переводы...
@@ -207,7 +223,7 @@ A: буква`
                       <div className="flex-1 min-w-0">
                         <p className={`text-2xl leading-relaxed font-medium ${isPlaying ? 'text-success font-bold' : ''}`}>
                           {ch && <span className="font-bold text-gray-400 text-xs mr-1">{ch.name}:</span>}
-                          <SyllableText text={lineText} />
+                          <SyllableText text={lineText} mode={readMode} />
                         </p>
                         {/* Translation — show on click */}
                         {tr && showTranslation[key] && (
@@ -256,7 +272,7 @@ A: буква`
               {sentences.map((s, i) => (
                 <div key={i} className="px-4 py-2 flex items-start gap-2">
                   <div className="flex-1">
-                    <p className="text-2xl font-bold"><SyllableText text={s.sentence} /></p>
+                    <p className="text-2xl font-bold"><SyllableText text={s.sentence} mode={readMode} /></p>
                     <p className="text-xs text-gray-400">{s.translation}</p>
                   </div>
                   <button onClick={() => speakSentence(s.sentence)} className="shrink-0 p-1 text-gray-300 hover:text-primary"><Volume2 size={11} /></button>
@@ -356,7 +372,7 @@ A: буква`
     <div className="max-w-md mx-auto">
       <p className="text-xs text-secondary font-bold mb-2">Прочитай вслух {speakIdx + 1}/{maxLines}</p>
       <div className="bg-white rounded-2xl p-5 shadow-sm mb-3">
-        <p className="text-2xl font-bold mb-2"><SyllableText text={curText} /></p>
+        <p className="text-2xl font-bold mb-2"><SyllableText text={curText} mode={readMode} /></p>
         <button onClick={() => speakSentence(curText)} className="text-xs text-primary flex items-center gap-1 mb-3"><Volume2 size={11} /> Послушать</button>
         <button onClick={listening ? () => { recRef.current?.stop(); setListening(false); } : startListening}
           className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${listening ? 'bg-error text-white animate-pulse' : 'bg-secondary text-white'}`}>
