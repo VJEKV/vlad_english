@@ -24,12 +24,21 @@ function cleanForTTS(text: string): string {
   return text.replace(/[\u{1F600}-\u{1FAFF}]/gu, '').replace(/[*_~`#]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// AI prompt for explaining sentences — pedagogical approach
-const EXPLAIN_PROMPT = `Ты сидишь рядом с ребёнком 8 лет и помогаешь ему читать по-английски.
-Он прочитал предложение и не всё понял. Помоги ему понять СМЫСЛ.
-Скажи "Тут говорится что..." и объясни ситуацию простыми словами.
-Если есть интересное слово — приведи пример из жизни ребёнка.
-Максимум 2 короткие строки. Без терминов. Без грамматики. Без emoji. Без markdown.`;
+// AI prompt — pronunciation + why each word is used
+const EXPLAIN_PROMPT = `Ты учитель английского для ребёнка 8 лет. Объясни как читать слова в предложении.
+Для КАЖДОГО слова дай:
+1. Как читать русскими буквами
+2. Зачем это слово тут используется (особенно для can, must, like, is, are, have, got и подобных)
+3. Если есть правило чтения — объясни коротко
+
+Формат строго:
+слово — читай «транскрипция». Пояснение.
+
+Пример:
+can — читай «кэн». Значит «умею». Тут Ларри говорит что он тоже умеет плавать.
+swim — читай «суим». sw читается как «су». Значит «плавать».
+
+Максимум 1 строка на слово. Без emoji. Без markdown. Только ключевые слова, не все подряд (пропускай the, a, I, и другие очевидные).`;
 
 interface Props {
   module: SpotlightModule;
@@ -196,7 +205,7 @@ A: буква`
         )}
 
         {currentText && (
-          <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-visible">
             <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b">
               <div>
                 <h4 className="font-bold text-sm text-primary">{currentText.title}</h4>
@@ -266,7 +275,7 @@ A: буква`
 
         {/* Key sentences */}
         {quizTextIdx === texts.length - 1 && sentences.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-visible">
             <div className="px-4 py-2 bg-gray-50 border-b"><h4 className="font-bold text-xs text-gray-500">Ключевые предложения</h4></div>
             <div className="divide-y divide-gray-50">
               {sentences.map((s, i) => (

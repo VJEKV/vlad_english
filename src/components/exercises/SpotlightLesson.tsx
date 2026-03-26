@@ -149,12 +149,13 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
 
   // ===== PHASE 2: Quiz Words (mistakes go to end of queue) =====
   if (phase === 'quiz_words') {
+    // Wait for queue to initialize (useEffect sets it async)
+    if (quizQueue.length === 0) return <div className="text-center py-8"><p className="text-gray-400">Загрузка...</p></div>;
     if (round >= quizQueue.length) {
       setPhase('spell_words'); setRound(0);
       return null;
     }
     const w = quizQueue[round];
-    if (!w) { setPhase('spell_words'); setRound(0); return null; }
 
     const handleAnswer = (answer: string) => {
       if (feedback) return;
@@ -205,12 +206,12 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
 
   // ===== PHASE 3: Spell Words (mistakes go to end) =====
   if (phase === 'spell_words') {
+    if (spellQueue.length === 0) return <div className="text-center py-8"><p className="text-gray-400">Загрузка...</p></div>;
     if (round >= spellQueue.length) {
       setPhase('read_sentences'); setRound(0);
       return null;
     }
     const sw = spellQueue[round];
-    if (!sw) { setPhase('read_sentences'); setRound(0); return null; }
 
     const handleSpellCheck = () => {
       if (!spellInput.trim()) return;

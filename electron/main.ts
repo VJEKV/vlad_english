@@ -233,7 +233,7 @@ app.whenReady().then(() => {
       if (!fs.existsSync(mp3Path)) {
         if (getKey('openai')) {
           try {
-            const instructions = `Pronounce only the syllable "${syllable}" as part of the word "${fullWord}". Say it slowly, clearly, like a teacher helping a child read. Only say "${syllable}", nothing else.`;
+            const instructions = `You are reading the word "${fullWord}" syllable by syllable for a child. Now say ONLY the syllable "${syllable}". Pronounce it exactly as it sounds inside "${fullWord}", not as separate letters. Speak slowly and clearly. Say nothing else.`;
             const buf = await callOpenAITTS(syllable, 'nova', 0.8, instructions);
             fs.writeFileSync(mp3Path, buf);
             console.log('[TTS] Syllable OpenAI:', syllable, 'of', fullWord);
