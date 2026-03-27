@@ -1,6 +1,6 @@
 {
   "name": "vlad-english",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "English learning app for school students (Spotlight 2-8, ages 7-14)",
   "main": "dist-electron/main.js",
   "scripts": {

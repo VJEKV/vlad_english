@@ -205,14 +205,56 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
     setSentenceModes(p => ({ ...p, [key]: p[key] === 'syllables' ? 'whole' : 'syllables' }));
   };
 
-  const stopAll = useCallback(() => { stopTTS(); setPlayingKey(''); }, [stopTTS]);
+  // Active highlight for reading
+  const [activeHighlight, setActiveHighlight] = useState<{ key: string; tokenIdx: number; sylIdx: number }>({ key: '', tokenIdx: -1, sylIdx: -1 });
 
-  const playSentence = useCallback(async (text: string, key: string) => {
+  const stopAll = useCallback(() => { stopTTS(); setPlayingKey(''); setActiveHighlight({ key: '', tokenIdx: -1, sylIdx: -1 }); }, [stopTTS]);
+
+  // Play sentence by syllables with highlighting
+  const playSentenceBySyllables = useCallback(async (text: string, key: string) => {
     if (playingKey) { stopAll(); return; }
     setPlayingKey(key);
+    const tokens = text.split(/\s+/);
+    for (let ti = 0; ti < tokens.length; ti++) {
+      const clean = tokens[ti].replace(/[.,!?;:'"()]/g, '');
+      if (!clean) continue;
+      const syls = getSyllables(clean);
+      if (syls.length > 1) {
+        for (let si = 0; si < syls.length; si++) {
+          setActiveHighlight({ key, tokenIdx: ti, sylIdx: si });
+          await speakSyllable(syls[si], clean);
+          await new Promise(r => setTimeout(r, syllableDelay));
+        }
+      } else {
+        setActiveHighlight({ key, tokenIdx: ti, sylIdx: 0 });
+        await speakWord(clean);
+        await new Promise(r => setTimeout(r, syllableDelay));
+      }
+    }
+    setActiveHighlight({ key: '', tokenIdx: -1, sylIdx: -1 });
+    await new Promise(r => setTimeout(r, 300));
+    // Full sentence
     await speakSentence(text);
     setPlayingKey('');
-  }, [playingKey, speakSentence, stopAll]);
+  }, [playingKey, speakSyllable, speakWord, speakSentence, stopAll, syllableDelay]);
+
+  // Play sentence whole with word highlighting
+  const playSentenceWhole = useCallback(async (text: string, key: string) => {
+    if (playingKey) { stopAll(); return; }
+    setPlayingKey(key);
+    const tokens = text.split(/\s+/);
+    for (let ti = 0; ti < tokens.length; ti++) {
+      const clean = tokens[ti].replace(/[.,!?;:'"()]/g, '');
+      if (!clean) continue;
+      setActiveHighlight({ key, tokenIdx: ti, sylIdx: -1 });
+      await speakWord(clean);
+      await new Promise(r => setTimeout(r, syllableDelay));
+    }
+    setActiveHighlight({ key: '', tokenIdx: -1, sylIdx: -1 });
+    await new Promise(r => setTimeout(r, 300));
+    await speakSentence(text);
+    setPlayingKey('');
+  }, [playingKey, speakWord, speakSentence, stopAll, syllableDelay]);
 
   const explainLine = async (text: string, key: string) => {
     if (aiExplanations[key] || !window.electronAPI?.ai) return;
@@ -391,41 +433,59 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
             {charInfo && <span className="text-lg shrink-0">{charInfo.icon}</span>}
             <div className="flex-1">
               {charInfo && <span className="text-xs font-bold text-gray-400">{charInfo.name}:</span>}
-              {/* Text with syllables or whole */}
+              {/* Text with syllables or whole — with green highlight */}
               <p className="text-2xl font-bold leading-relaxed mt-1">
-                {words.map((token, ti) => {
-                  if (/^\s+$/.test(token)) return <span key={ti}> </span>;
-                  const clean = token.replace(/[.,!?;:'"()]/g, '');
-                  const punct = token.slice(clean.length);
-                  if (!clean) return <span key={ti}>{token}</span>;
-                  const syls = getSyllables(clean);
+                {(() => {
+                  // Count only non-space tokens for highlight index
+                  let wordIdx = 0;
+                  return words.map((token, ti) => {
+                    if (/^\s+$/.test(token)) return <span key={ti}> </span>;
+                    const clean = token.replace(/[.,!?;:'"()]/g, '');
+                    const punct = token.slice(clean.length);
+                    if (!clean) return <span key={ti}>{token}</span>;
+                    const syls = getSyllables(clean);
+                    const curWordIdx = wordIdx++;
+                    const isHighlightedWord = activeHighlight.key === key && activeHighlight.tokenIdx === curWordIdx;
 
-                  if (mode === 'syllables' && syls.length > 1) {
-                    return <span key={ti} className="inline-block">
-                      {syls.map((s, si) => (
-                        <span key={si}>
-                          <span onClick={() => speakSyllable(s, clean)} className="cursor-pointer hover:text-primary hover:bg-primary/5 rounded px-0.5">{s}</span>
-                          {si < syls.length - 1 && <span className="text-gray-300 mx-px text-lg">·</span>}
-                        </span>
-                      ))}
-                      {punct}<span> </span>
+                    if (mode === 'syllables' && syls.length > 1) {
+                      return <span key={ti} className="inline-block">
+                        {syls.map((s, si) => {
+                          const isSylHighlighted = isHighlightedWord && activeHighlight.sylIdx === si;
+                          return (
+                            <span key={si}>
+                              <span onClick={() => speakSyllable(s, clean)}
+                                className={`cursor-pointer rounded px-0.5 transition-all duration-200 ${
+                                  isSylHighlighted ? 'bg-success text-white scale-110 inline-block' : 'hover:text-primary hover:bg-primary/5'
+                                }`}>{s}</span>
+                              {si < syls.length - 1 && <span className="text-gray-300 mx-px text-lg">·</span>}
+                            </span>
+                          );
+                        })}
+                        {punct}<span> </span>
+                      </span>;
+                    }
+                    return <span key={ti}>
+                      <span onClick={() => speakWord(clean)}
+                        className={`cursor-pointer rounded px-0.5 transition-all duration-200 ${
+                          isHighlightedWord ? 'bg-success text-white scale-110 inline-block' : 'hover:text-primary hover:bg-primary/5'
+                        }`}>{token}</span>
+                      <span> </span>
                     </span>;
-                  }
-                  return <span key={ti}><span onClick={() => speakWord(clean)} className="cursor-pointer hover:text-primary hover:bg-primary/5 rounded px-0.5">{token}</span><span> </span></span>;
-                })}
+                  });
+                })()}
               </p>
             </div>
           </div>
 
           {/* Buttons for this sentence */}
           <div className="flex items-center gap-1.5 ml-7 mt-1">
-            <button onClick={() => toggleSentenceMode(key)}
+            <button onClick={() => { setSentenceModes(p => ({ ...p, [key]: 'syllables' })); playSentenceBySyllables(text, key); }}
               className={`px-2.5 py-1 rounded-lg text-xs font-bold ${mode === 'syllables' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'}`}>
-              📖 По слогам
+              {isPlaying && mode === 'syllables' ? <><Square size={10} className="inline mr-0.5" />Стоп</> : <>📖 По слогам</>}
             </button>
-            <button onClick={() => { setSentenceModes(p => ({ ...p, [key]: 'whole' })); playSentence(text, key); }}
+            <button onClick={() => { setSentenceModes(p => ({ ...p, [key]: 'whole' })); playSentenceWhole(text, key); }}
               className={`px-2.5 py-1 rounded-lg text-xs font-bold ${mode === 'whole' ? 'bg-secondary text-white' : 'bg-gray-100 text-gray-500'}`}>
-              {isPlaying ? <><Square size={10} className="inline mr-0.5" />Стоп</> : <>▶ Целиком</>}
+              {isPlaying && mode === 'whole' ? <><Square size={10} className="inline mr-0.5" />Стоп</> : <>▶ Целиком</>}
             </button>
             {tr !== undefined && (
               <button onClick={() => setShowTranslation(p => ({ ...p, [key]: !p[key] }))}

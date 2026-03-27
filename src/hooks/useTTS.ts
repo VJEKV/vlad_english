@@ -4,9 +4,9 @@ import { useSettingsStore } from '../store/useSettingsStore';
 export type TTSSpeed = 'slow' | 'normal' | 'fast';
 
 const RATES: Record<TTSSpeed, { letter: string; word: string; sentence: string }> = {
-  slow:   { letter: '-50%', word: '-30%', sentence: '-15%' },
-  normal: { letter: '-20%', word: '+0%',  sentence: '+0%' },
-  fast:   { letter: '+0%',  word: '+15%', sentence: '+20%' },
+  slow:   { letter: '-60%', word: '-45%', sentence: '-35%' },
+  normal: { letter: '-30%', word: '-15%', sentence: '-10%' },
+  fast:   { letter: '+0%',  word: '+0%',  sentence: '+10%' },
 };
 
 // Global audio ref for stopping
