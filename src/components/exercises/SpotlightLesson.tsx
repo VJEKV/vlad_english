@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Volume2, Star, ChevronRight, BookOpen, Square, Eye, Bot, Loader2, Mic, MicOff } from 'lucide-react';
 import { useTTS } from '../../hooks/useTTS';
@@ -183,8 +183,6 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
   const [aiLoadingKey, setAiLoadingKey] = useState('');
   const playingRef = useRef(false);
 
-  // Need useRef for playingRef
-  const { useRef: _useRef } = { useRef: useState };
 
   // AI translate on mount
   useEffect(() => {
