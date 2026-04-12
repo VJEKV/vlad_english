@@ -120,7 +120,7 @@ export default function SettingsPage() {
         <AIKeySettings />
 
         <div className="text-center text-sm text-gray-300 mt-8">
-          VladEnglish v3.1.0
+          VladEnglish v3.2.0
         </div>
       </div>
     </div>
