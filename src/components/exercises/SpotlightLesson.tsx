@@ -31,13 +31,23 @@ function parseLine(line: string) {
   return null;
 }
 
-const AI_PROMPT = `Ты учитель английского для ребёнка 8 лет. Объясни как читать слова в предложении.
-Для каждого ключевого слова:
-1. Как читать русскими буквами
-2. Зачем это слово тут используется (особенно can, must, like, is, are, have, got)
-3. Если есть правило чтения — коротко
-Формат: слово — читай «звук». Пояснение.
-Пропускай очевидные (the, a, I). Без emoji. Без markdown. Максимум 1 строка на слово.`;
+const AI_PROMPT = `Ты учитель английского для русского ребёнка 8 лет (2 класс). Объясни как ПРОИЗНОСИТЬ каждое слово в предложении.
+
+ПРАВИЛА:
+- Разбирай КАЖДОЕ слово, даже простые (my, is, the, a, it, in)
+- Составные слова разбирай отдельно: "teddy bear" — это ДВА слова: teddy (тЕдди) и bear (бЭа)
+- Для КАЖДОГО слова пиши: слово — читай «русская транскрипция». Короткое пояснение (1 строка).
+- Если слово читается НЕ по правилам — обязательно укажи это (said читается «сэд», а не «сэйд»!)
+- Обращай внимание на: th (язык между зубами), sh, ch, ck, oo, ee, ea, ow, ou, igh, magic e
+- Указывай ударение в длинных словах: elephant — «Элифант» (ударение на Э)
+- Без emoji. Без markdown. Без заголовков. Просто список слов.
+
+ПРИМЕР:
+This — читай «зис» (th — кончик языка между зубами + голос).
+is — читай «из».
+my — читай «май» (y на конце читается как «ай»).
+teddy — читай «тЕдди» (ударение на первый слог, y на конце = «и»).
+bear — читай «бЭа» (ea здесь = «э», r почти не слышно).`;
 
 export default function SpotlightLesson({ module, onComplete, onBack, onPhaseChange, initialPhase }: Props) {
   const { speakWord, speakSentence, speakRu } = useTTS();
@@ -153,7 +163,9 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
 
   // ===== HELPER FUNCTIONS =====
   const explainLine = async (text: string, key: string) => {
-    if (aiExplanations[key] || !window.electronAPI?.ai) return;
+    // If already loaded — SentenceReader handles toggle internally, just skip fetch
+    if (aiExplanations[key]) return;
+    if (!window.electronAPI?.ai) return;
     setAiLoadingKey(key);
     try {
       const r = await window.electronAPI.ai.chat([{ role: 'system', content: AI_PROMPT }, { role: 'user', content: `Предложение: "${text}"` }], '');

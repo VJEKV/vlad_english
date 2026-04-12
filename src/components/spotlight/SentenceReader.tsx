@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Square, BookOpen, Volume2, Eye, Bot, Loader2 } from 'lucide-react';
+import { Square, Volume2, Eye, Bot, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getSyllables } from '../../content/syllables';
 import { playWord, playSyllable, stopAudio } from '../../audio/player';
 import { useTTS } from '../../hooks/useTTS';
 import { lookupWord } from '../common/WordCard';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
 // Word with hover card showing emoji + translation
 function WordWithCard({ children, word, className, onClick }: {
@@ -35,7 +36,6 @@ function WordWithCard({ children, word, className, onClick }: {
     </span>
   );
 }
-import { useSettingsStore } from '../../store/useSettingsStore';
 
 interface Props {
   text: string;
@@ -48,11 +48,6 @@ interface Props {
   speakRuFn?: (text: string) => void;
 }
 
-/**
- * A single sentence with per-sentence [По слогам] [Целиком] toggle.
- * Green highlight marker runs through syllables/words during playback.
- * Uses pre-generated mp3 (instant), falls back to TTS API.
- */
 export default function SentenceReader({
   text, charIcon, charName, translation, onAIExplain, aiExplanation, aiLoading, speakRuFn
 }: Props) {
@@ -63,6 +58,7 @@ export default function SentenceReader({
   const [activeWordIdx, setActiveWordIdx] = useState(-1);
   const [activeSylIdx, setActiveSylIdx] = useState(-1);
   const [showTranslation, setShowTranslation] = useState(false);
+  const [showAI, setShowAI] = useState(true); // AI explanation visible by default when loaded
 
   // Parse words (skip whitespace)
   const rawTokens = text.split(/\s+/);
@@ -70,7 +66,7 @@ export default function SentenceReader({
   // Play word from mp3, fallback API
   const pw = async (w: string) => { try { await playWord(w); } catch { await ttsWord(w); } };
   const ps = async (syl: string, word: string) => { try { await playSyllable(syl, word); } catch { await ttsSyl(syl, word); } };
-  const pSent = async (t: string) => { try { /* no sentence mp3 yet */ await ttsSent(t); } catch {} };
+  const pSent = async (t: string) => { try { await ttsSent(t); } catch {} };
 
   // "По слогам" — read by syllables with green marker
   const playSyllables = useCallback(async () => {
@@ -144,6 +140,18 @@ export default function SentenceReader({
     setTimeout(() => setActiveWordIdx(-1), 400);
   };
 
+  // Handle AI explain toggle
+  const handleAIToggle = () => {
+    if (aiExplanation) {
+      // Already loaded — just toggle visibility
+      setShowAI(!showAI);
+    } else if (onAIExplain) {
+      // Not loaded yet — fetch and show
+      setShowAI(true);
+      onAIExplain();
+    }
+  };
+
   return (
     <div className="px-4 py-3 border-b border-gray-50">
       {/* Character + text */}
@@ -210,34 +218,44 @@ export default function SentenceReader({
         </button>
         {translation !== undefined && (
           <button onClick={() => setShowTranslation(!showTranslation)}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold ${showTranslation ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-            <Eye size={10} className="inline mr-0.5" />Перевод
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-0.5 ${showTranslation ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+            <Eye size={10} />Перевод
+            {showTranslation ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
           </button>
         )}
         {onAIExplain && (
-          <button onClick={onAIExplain}
-            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-500 hover:bg-gray-200">
-            {aiLoading ? <Loader2 size={10} className="inline animate-spin mr-0.5" /> : <Bot size={10} className="inline mr-0.5" />}
+          <button onClick={handleAIToggle}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-0.5 ${
+              aiExplanation && showAI ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            }`}>
+            {aiLoading ? <Loader2 size={10} className="animate-spin" /> : <Bot size={10} />}
             Как читать
+            {aiExplanation && (showAI ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
           </button>
         )}
       </div>
 
-      {/* Translation */}
-      {showTranslation && translation && (
-        <p className="text-sm text-gray-400 italic ml-7 mt-1">{translation}</p>
-      )}
+      {/* Translation — always available, toggles on click */}
+      <AnimatePresence>
+        {showTranslation && translation && (
+          <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            className="text-sm text-gray-400 italic ml-7 mt-1 overflow-hidden">{translation}</motion.p>
+        )}
+      </AnimatePresence>
 
-      {/* AI explanation */}
-      {aiExplanation && (
-        <div className="ml-7 mt-2 bg-blue-50 rounded-lg px-3 py-2">
-          <p className="text-xs text-gray-600 whitespace-pre-wrap">{aiExplanation}</p>
-          {speakRuFn && (
-            <button onClick={() => speakRuFn(aiExplanation.replace(/[\u{1F600}-\u{1FAFF}]/gu, '').replace(/[*_~`#]/g, ''))}
-              className="text-xs text-primary mt-1"><Volume2 size={9} className="inline" /> Озвучить</button>
-          )}
-        </div>
-      )}
+      {/* AI explanation — collapsible */}
+      <AnimatePresence>
+        {aiExplanation && showAI && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            className="ml-7 mt-2 bg-blue-50 rounded-lg px-3 py-2 overflow-hidden">
+            <p className="text-xs text-gray-600 whitespace-pre-wrap">{aiExplanation}</p>
+            {speakRuFn && (
+              <button onClick={() => speakRuFn(aiExplanation.replace(/[\u{1F600}-\u{1FAFF}]/gu, '').replace(/[*_~`#]/g, ''))}
+                className="text-xs text-primary mt-1"><Volume2 size={9} className="inline" /> Озвучить</button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
