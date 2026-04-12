@@ -57,8 +57,6 @@ export default function SpotlightPage() {
         {modules.map((mod, i) => {
           const progress = lessonsCompleted[`spotlight_${mod.id}`];
           const stars = progress?.stars ?? 0;
-          const savedPhase = getLessonPhase(`spotlight_${mod.id}`);
-          const inProgress = savedPhase && savedPhase.phase !== 'completed' && savedPhase.phase !== 'learn_words';
 
           return (
             <motion.button
@@ -69,17 +67,12 @@ export default function SpotlightPage() {
               onClick={() => setActiveModule(mod)}
               className="w-full flex items-center gap-4 p-5 bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow text-left"
             >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold ${
-                inProgress ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary'
-              }`}>
-                {inProgress ? <RotateCcw size={20} /> : i + 1}
+              <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                {i + 1}
               </div>
               <div className="flex-1">
                 <h3 className="font-bold">{mod.title}</h3>
-                <p className="text-sm text-gray-400">
-                  {mod.titleRu} — {mod.words.length} слов
-                  {inProgress && <span className="text-warning ml-2">• Продолжить</span>}
-                </p>
+                <p className="text-sm text-gray-400">{mod.titleRu} — {mod.words.length} слов</p>
               </div>
               <div className="flex gap-0.5 mr-2">
                 {[1, 2, 3].map((s) => (

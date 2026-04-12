@@ -121,9 +121,17 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
     }
   }, [phase, quizRound, quizQueue.length]);
 
+  // Auto-advance quiz when done (via useEffect, not during render)
+  useEffect(() => {
+    if (phase === 'quiz' && quizQueue.length > 0 && quizRound >= quizQueue.length) {
+      setPhase('read');
+    }
+  }, [phase, quizRound, quizQueue.length]);
+
   if (phase === 'quiz') {
-    if (quizQueue.length === 0) return <div className="text-center py-8"><Loader2 size={24} className="animate-spin text-primary mx-auto" /></div>;
-    if (quizRound >= quizQueue.length) { setPhase('read'); return null; }
+    if (quizQueue.length === 0 || quizRound >= quizQueue.length) {
+      return <div className="text-center py-8"><Loader2 size={24} className="animate-spin text-primary mx-auto" /><p className="text-sm text-gray-400 mt-2">Загрузка проверки...</p></div>;
+    }
     const w = quizQueue[quizRound];
     return (
       <div><Header />
@@ -145,7 +153,7 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
                 setQuizSel(opt); setQuizFb(ok ? 'correct' : 'wrong');
                 if (ok) setQuizScore(s => s + 1); else setQuizQueue(q => [...q, q[quizRound]]);
                 speakWord(w.word);
-                setTimeout(() => { if (quizRound + 1 >= quizQueue.length + (ok ? 0 : 1)) setPhase('read'); else setQuizRound(r => r + 1); }, 1500);
+                setTimeout(() => setQuizRound(r => r + 1), 1500);
               }} className={`p-4 rounded-xl text-lg font-bold transition-colors ${st}`}>{opt}</button>;
             })}
           </div>
@@ -281,14 +289,19 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
     }
   }, [phase, testRound, testQueue.length]);
 
-  if (phase === 'test') {
-    if (testQueue.length === 0) return <div className="text-center py-8"><Loader2 size={24} className="animate-spin text-primary mx-auto" /></div>;
-    if (testRound >= testQueue.length) {
+  // Auto-advance test when done
+  useEffect(() => {
+    if (phase === 'test' && testQueue.length > 0 && testRound >= testQueue.length) {
       const pct = (quizScore + testScore) / (quizQueue.length + testQueue.length);
       const stars = pct >= 0.9 ? 3 : pct >= 0.7 ? 2 : pct >= 0.4 ? 1 : 0;
       onComplete(stars);
       setPhase('results');
-      return null;
+    }
+  }, [phase, testRound, testQueue.length]);
+
+  if (phase === 'test') {
+    if (testQueue.length === 0 || testRound >= testQueue.length) {
+      return <div className="text-center py-8"><Loader2 size={24} className="animate-spin text-primary mx-auto" /><p className="text-sm text-gray-400 mt-2">Загрузка теста...</p></div>;
     }
     const tw = testQueue[testRound];
     return (
