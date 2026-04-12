@@ -21,5 +21,6 @@ nsis:
   allowToChangeInstallationDirectory: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: VladEnglish2
+  shortcutName: VladEnglish
   deleteAppDataOnUninstall: true
+  include: build/installer.nsh
