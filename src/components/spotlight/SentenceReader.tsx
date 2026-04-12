@@ -1,8 +1,40 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Square, BookOpen, Volume2, Eye, Bot, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { getSyllables } from '../../content/syllables';
 import { playWord, playSyllable, stopAudio } from '../../audio/player';
 import { useTTS } from '../../hooks/useTTS';
+import { lookupWord } from '../common/WordCard';
+
+// Word with hover card showing emoji + translation
+function WordWithCard({ children, word, className, onClick }: {
+  children: React.ReactNode; word: string; className?: string; onClick?: () => void;
+}) {
+  const [show, setShow] = useState(false);
+  const showRef = useRef<ReturnType<typeof setTimeout>>();
+  const hideRef = useRef<ReturnType<typeof setTimeout>>();
+  const info = lookupWord(word);
+
+  useEffect(() => () => { clearTimeout(showRef.current); clearTimeout(hideRef.current); }, []);
+
+  return (
+    <span className="relative inline-block"
+      onMouseEnter={() => { clearTimeout(hideRef.current); showRef.current = setTimeout(() => setShow(true), 500); }}
+      onMouseLeave={() => { clearTimeout(showRef.current); hideRef.current = setTimeout(() => setShow(false), 100); }}>
+      <span onClick={onClick} className={className}>{children}</span>
+      <AnimatePresence>
+        {show && info && (
+          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
+            className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 p-2 min-w-[110px] text-center pointer-events-none">
+            <span className="text-3xl block">{info.emoji}</span>
+            <p className="font-bold text-xs">{word}</p>
+            <p className="text-xs text-gray-600">{info.ru}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </span>
+  );
+}
 import { useSettingsStore } from '../../store/useSettingsStore';
 
 interface Props {
@@ -134,10 +166,10 @@ export default function SentenceReader({
                       const isSylActive = isWordActive && (activeSylIdx === si || activeSylIdx === -1 && activeWordIdx === -2);
                       return (
                         <span key={si}>
-                          <span onClick={() => clickSyl(s, clean, wi, si)}
+                          <WordWithCard word={clean} onClick={() => clickSyl(s, clean, wi, si)}
                             className={`cursor-pointer rounded px-0.5 transition-all duration-200 ${
                               isSylActive ? 'bg-success text-white' : 'hover:text-primary hover:bg-primary/5'
-                            }`}>{s}</span>
+                            }`}>{s}</WordWithCard>
                           {si < syls.length - 1 && <span className="text-gray-300 mx-px text-lg">·</span>}
                         </span>
                       );
