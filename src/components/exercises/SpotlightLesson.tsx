@@ -110,21 +110,28 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
   const [quizFb, setQuizFb] = useState<'correct' | 'wrong' | null>(null);
   const [quizScore, setQuizScore] = useState(0);
 
-  useEffect(() => { if (phase === 'quiz' && quizQueue.length === 0) { setQuizQueue([...lessonWords]); setQuizRound(0); } }, [phase]);
+  // Single useEffect for quiz — init, generate options, or advance
   useEffect(() => {
-    if (phase === 'quiz' && quizQueue.length > 0 && quizRound < quizQueue.length) {
-      const w = quizQueue[quizRound];
+    if (phase !== 'quiz') return;
+    // Step 1: Init queue if empty
+    if (quizQueue.length === 0) {
+      setQuizQueue([...lessonWords]);
+      setQuizRound(0);
+      return; // wait for next render with filled queue
+    }
+    // Step 2: All done → advance to read
+    if (quizRound >= quizQueue.length) {
+      setPhase('read');
+      return;
+    }
+    // Step 3: Generate options for current round
+    const w = quizQueue[quizRound];
+    if (w) {
       const wrong = shuffle(allWords.filter(x => x.word !== w.word).map(x => x.translation)).slice(0, 2);
       setQuizOpts(shuffle([w.translation, ...wrong]));
       setQuizAns(w.translation);
-      setQuizSel(null); setQuizFb(null);
-    }
-  }, [phase, quizRound, quizQueue.length]);
-
-  // Auto-advance quiz when done (via useEffect, not during render)
-  useEffect(() => {
-    if (phase === 'quiz' && quizQueue.length > 0 && quizRound >= quizQueue.length) {
-      setPhase('read');
+      setQuizSel(null);
+      setQuizFb(null);
     }
   }, [phase, quizRound, quizQueue.length]);
 
@@ -279,23 +286,28 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
   const [testFb, setTestFb] = useState<'correct' | 'wrong' | null>(null);
   const [testScore, setTestScore] = useState(0);
 
-  useEffect(() => { if (phase === 'test' && testQueue.length === 0) { setTestQueue(shuffle([...lessonWords]).slice(0, 6)); setTestRound(0); } }, [phase]);
+  // Single useEffect for test
   useEffect(() => {
-    if (phase === 'test' && testQueue.length > 0 && testRound < testQueue.length) {
-      const w = testQueue[testRound];
-      const wrong = shuffle(allWords.filter(x => x.word !== w.word).map(x => x.word)).slice(0, 2);
-      setTestOpts(shuffle([w.word, ...wrong]));
-      setTestAns(w.word); setTestSel(null); setTestFb(null);
+    if (phase !== 'test') return;
+    if (testQueue.length === 0) {
+      setTestQueue(shuffle([...lessonWords]).slice(0, 6));
+      setTestRound(0);
+      return;
     }
-  }, [phase, testRound, testQueue.length]);
-
-  // Auto-advance test when done
-  useEffect(() => {
-    if (phase === 'test' && testQueue.length > 0 && testRound >= testQueue.length) {
+    if (testRound >= testQueue.length) {
       const pct = (quizScore + testScore) / (quizQueue.length + testQueue.length);
       const stars = pct >= 0.9 ? 3 : pct >= 0.7 ? 2 : pct >= 0.4 ? 1 : 0;
       onComplete(stars);
       setPhase('results');
+      return;
+    }
+    const w = testQueue[testRound];
+    if (w) {
+      const wrong = shuffle(allWords.filter(x => x.word !== w.word).map(x => x.word)).slice(0, 2);
+      setTestOpts(shuffle([w.word, ...wrong]));
+      setTestAns(w.word);
+      setTestSel(null);
+      setTestFb(null);
     }
   }, [phase, testRound, testQueue.length]);
 
