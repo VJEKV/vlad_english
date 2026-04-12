@@ -9,7 +9,7 @@ import { useWordStore } from '../../store/useWordStore';
 import SyllableDisplay from '../spotlight/SyllableDisplay';
 import SentenceReader from '../spotlight/SentenceReader';
 
-type Phase = 'learn' | 'quiz' | 'read' | 'grammar' | 'test' | 'results';
+type Phase = 'learn' | 'quiz' | 'read' | 'dialogueTest' | 'grammar' | 'test' | 'results';
 
 interface Props {
   module: SpotlightModule;
@@ -48,6 +48,92 @@ is — читай «из».
 my — читай «май» (y на конце читается как «ай»).
 teddy — читай «тЕдди» (ударение на первый слог, y на конце = «и»).
 bear — читай «бЭа» (ea здесь = «э», r почти не слышно).`;
+
+// Generate dialogue comprehension questions from module data
+interface DialogueQuestion {
+  type: 'translate_word' | 'translate_sentence' | 'pick_word' | 'true_false';
+  question: string;
+  options: string[];
+  correctIndex: number;
+}
+
+function generateDialogueQuestions(module: SpotlightModule): DialogueQuestion[] {
+  const questions: DialogueQuestion[] = [];
+  const words = module.words;
+  const texts = module.texts || [];
+  const sentences = module.sentences;
+
+  // Collect all dialogue lines
+  const allLines: string[] = [];
+  texts.forEach(t => t.lines.forEach(l => {
+    const ch = parseLine(l);
+    allLines.push(ch ? ch.text : l);
+  }));
+
+  // Type 1: Word from dialogue — what does it mean? (use module words)
+  const dialogueWords = words.filter(w => {
+    const wLower = w.word.toLowerCase();
+    return allLines.some(line => line.toLowerCase().includes(wLower));
+  });
+  const wordsForTest = shuffle(dialogueWords).slice(0, 4);
+  wordsForTest.forEach(w => {
+    const wrong = shuffle(words.filter(x => x.word !== w.word)).slice(0, 2);
+    const opts = shuffle([
+      { text: w.translation, correct: true },
+      ...wrong.map(wr => ({ text: wr.translation, correct: false })),
+    ]);
+    questions.push({
+      type: 'translate_word',
+      question: `Что значит "${w.word}"?`,
+      options: opts.map(o => o.text),
+      correctIndex: opts.findIndex(o => o.correct),
+    });
+  });
+
+  // Type 2: Sentence translation — pick correct meaning
+  const sentencesForTest = shuffle([...sentences]).slice(0, 3);
+  sentencesForTest.forEach(s => {
+    // Generate wrong translations from other sentences
+    const wrongSentences = shuffle(sentences.filter(x => x.sentence !== s.sentence)).slice(0, 2);
+    const wrongTranslations = wrongSentences.map(ws => ws.translation);
+    // If not enough wrong sentences, make up simple wrong ones
+    while (wrongTranslations.length < 2) {
+      const rw = shuffle(words).slice(0, 2);
+      wrongTranslations.push(`${rw[0]?.translation || 'кот'} и ${rw[1]?.translation || 'собака'}`);
+    }
+    const opts = shuffle([
+      { text: s.translation, correct: true },
+      ...wrongTranslations.map(t => ({ text: t, correct: false })),
+    ]);
+    questions.push({
+      type: 'translate_sentence',
+      question: `Переведи: "${s.sentence}"`,
+      options: opts.map(o => o.text),
+      correctIndex: opts.findIndex(o => o.correct),
+    });
+  });
+
+  // Type 3: Pick English word for Russian translation (reverse of Type 1)
+  const reverseWords = shuffle(dialogueWords.filter(w => !wordsForTest.includes(w)).length > 0
+    ? dialogueWords.filter(w => !wordsForTest.includes(w))
+    : dialogueWords
+  ).slice(0, 3);
+  reverseWords.forEach(w => {
+    const wrong = shuffle(words.filter(x => x.word !== w.word)).slice(0, 2);
+    const opts = shuffle([
+      { text: w.word, correct: true },
+      ...wrong.map(wr => ({ text: wr.word, correct: false })),
+    ]);
+    questions.push({
+      type: 'pick_word',
+      question: `Как по-английски "${w.translation}"?`,
+      options: opts.map(o => o.text),
+      correctIndex: opts.findIndex(o => o.correct),
+    });
+  });
+
+  return shuffle(questions);
+}
 
 export default function SpotlightLesson({ module, onComplete, onBack, onPhaseChange, initialPhase }: Props) {
   const { speakWord, speakSentence, speakRu } = useTTS();
@@ -124,6 +210,27 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
       }).catch(() => {});
   }, [phase]);
 
+  // Dialogue test state
+  const [dtQuestions, setDtQuestions] = useState<DialogueQuestion[]>([]);
+  const [dtRound, setDtRound] = useState(0);
+  const [dtSel, setDtSel] = useState<number | null>(null);
+  const [dtFb, setDtFb] = useState<'correct' | 'wrong' | null>(null);
+  const [dtScore, setDtScore] = useState(0);
+  const dtInitialized = useRef(false);
+
+  useEffect(() => {
+    if (phase !== 'dialogueTest') { dtInitialized.current = false; return; }
+    if (!dtInitialized.current) {
+      const qs = generateDialogueQuestions(module);
+      setDtQuestions(qs);
+      setDtRound(0);
+      setDtScore(0);
+      setDtSel(null);
+      setDtFb(null);
+      dtInitialized.current = true;
+    }
+  }, [phase]);
+
   // Test state
   const [testQueue, setTestQueue] = useState<typeof allWords>([]);
   const [testRound, setTestRound] = useState(0);
@@ -143,7 +250,9 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
       return;
     }
     if (testQueue.length > 0 && testRound >= testQueue.length) {
-      const pct = (quizScore + testScore) / ((quizQueue.length || lessonWords.length) + testQueue.length);
+      const totalScore = quizScore + dtScore + testScore;
+      const totalMax = (quizQueue.length || lessonWords.length) + (dtQuestions.length || 1) + testQueue.length;
+      const pct = totalMax > 0 ? totalScore / totalMax : 0;
       const stars = pct >= 0.9 ? 3 : pct >= 0.7 ? 2 : pct >= 0.4 ? 1 : 0;
       onComplete(stars);
       setPhase('results');
@@ -163,7 +272,6 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
 
   // ===== HELPER FUNCTIONS =====
   const explainLine = async (text: string, key: string) => {
-    // If already loaded — SentenceReader handles toggle internally, just skip fetch
     if (aiExplanations[key]) return;
     if (!window.electronAPI?.ai) return;
     setAiLoadingKey(key);
@@ -175,8 +283,8 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
   };
 
   const phaseLabels: Record<Phase, string> = {
-    learn: '1/5 — Изучаем слова', quiz: '2/5 — Проверка', read: '3/5 — Читаем',
-    grammar: '4/5 — Грамматика', test: '5/5 — Тест', results: 'Результаты',
+    learn: '1/6 — Изучаем слова', quiz: '2/6 — Проверка слов', read: '3/6 — Читаем диалог',
+    dialogueTest: '4/6 — Тест по диалогу', grammar: '5/6 — Грамматика', test: '6/6 — Итоговый тест', results: 'Результаты',
   };
   const Hdr = () => (
     <div className="flex items-center gap-4 mb-4">
@@ -287,7 +395,93 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
               ))}
             </div>
           )}
-          <button onClick={() => setPhase('grammar')} className="w-full px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm">Далее → Грамматика</button>
+          <button onClick={() => setPhase('dialogueTest')} className="w-full px-4 py-2.5 bg-info text-white rounded-xl font-bold text-sm">
+            Тест по диалогу →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ===== DIALOGUE TEST — right after reading =====
+  if (phase === 'dialogueTest') {
+    if (dtQuestions.length === 0) {
+      // No questions generated — skip to grammar
+      return (
+        <div className="text-center py-8">
+          <Loader2 size={24} className="animate-spin text-primary mx-auto" />
+          {/* Auto-skip after init */}
+          {dtInitialized.current && setTimeout(() => setPhase('grammar'), 100) && null}
+        </div>
+      );
+    }
+    if (dtRound >= dtQuestions.length) {
+      // Done — show mini results and go to grammar
+      return (
+        <div><Hdr />
+          <div className="flex flex-col items-center max-w-3xl mx-auto py-6">
+            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
+              <p className="text-5xl mb-4">{dtScore >= dtQuestions.length * 0.8 ? '🎉' : dtScore >= dtQuestions.length * 0.5 ? '👍' : '💪'}</p>
+              <h3 className="text-2xl font-bold text-primary mb-2">Тест по диалогу</h3>
+              <p className="text-xl font-bold mb-1">{dtScore} из {dtQuestions.length} правильно</p>
+              <p className="text-sm text-gray-400 mb-6">
+                {dtScore >= dtQuestions.length * 0.8 ? 'Отлично! Ты хорошо понял диалог!' : 'Перечитай диалог ещё раз и попробуй снова!'}
+              </p>
+              <button onClick={() => setPhase('grammar')} className="px-8 py-3 bg-primary text-white rounded-xl font-bold text-lg">
+                Далее → Грамматика
+              </button>
+            </motion.div>
+          </div>
+        </div>
+      );
+    }
+
+    const dq = dtQuestions[dtRound];
+    return (
+      <div><Hdr />
+        <div className="flex flex-col items-center max-w-3xl mx-auto">
+          <p className="text-gray-500 text-sm mb-1">{dtRound + 1} из {dtQuestions.length}</p>
+          <PBar current={dtRound + 1} total={dtQuestions.length} color="bg-info" />
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm mb-6 w-full max-w-md text-center">
+            <p className="text-xs text-gray-400 mb-2 uppercase font-bold">
+              {dq.type === 'translate_word' ? 'Слово из диалога' : dq.type === 'translate_sentence' ? 'Предложение из диалога' : 'Слово из диалога'}
+            </p>
+            <p className="text-2xl font-bold">{dq.question}</p>
+          </div>
+
+          <div className="flex flex-col gap-3 w-full max-w-sm">
+            {dq.options.map((opt, i) => {
+              let st = 'bg-white border-2 border-gray-200 hover:border-info text-gray-800';
+              if (dtFb !== null) {
+                if (i === dq.correctIndex) st = 'bg-success border-2 border-success text-white';
+                else if (i === dtSel && i !== dq.correctIndex) st = 'bg-error border-2 border-error text-white';
+                else st = 'bg-gray-100 border-2 border-gray-100 text-gray-400';
+              }
+              return (
+                <button key={`dt${dtRound}-${i}`} onClick={() => {
+                  if (dtFb !== null) return;
+                  const ok = i === dq.correctIndex;
+                  setDtSel(i);
+                  setDtFb(ok ? 'correct' : 'wrong');
+                  if (ok) setDtScore(s => s + 1);
+                  setTimeout(() => {
+                    setDtSel(null);
+                    setDtFb(null);
+                    setDtRound(r => r + 1);
+                  }, 1500);
+                }} className={`p-4 rounded-xl text-lg font-bold transition-colors ${st}`}>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+
+          {dtFb && (
+            <p className={`mt-4 text-lg font-bold ${dtFb === 'correct' ? 'text-success' : 'text-error'}`}>
+              {dtFb === 'correct' ? 'Верно!' : `Правильно: ${dq.options[dq.correctIndex]}`}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -356,9 +550,9 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
   }
 
   // RESULTS
-  const total = quizScore + testScore;
-  const max = (quizQueue.length || lessonWords.length) + (testQueue.length || 6);
-  const pct = max > 0 ? total / max : 0;
+  const totalScore = quizScore + dtScore + testScore;
+  const totalMax = (quizQueue.length || lessonWords.length) + (dtQuestions.length || 0) + (testQueue.length || 6);
+  const pct = totalMax > 0 ? totalScore / totalMax : 0;
   const stars = pct >= 0.9 ? 3 : pct >= 0.7 ? 2 : pct >= 0.4 ? 1 : 0;
   return (
     <div className="flex flex-col items-center py-8">
@@ -371,8 +565,12 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
             </motion.div>
           ))}
         </div>
-        <p className="text-lg">Проверка: <b>{quizScore}</b> | Тест: <b>{testScore}</b></p>
-        <button onClick={onBack} className="mt-6 px-8 py-3 bg-primary text-white rounded-xl font-bold">К модулям</button>
+        <div className="space-y-1 mb-4">
+          <p className="text-sm">Слова: <b>{quizScore}</b>/{quizQueue.length || lessonWords.length}</p>
+          <p className="text-sm">Диалог: <b>{dtScore}</b>/{dtQuestions.length || 0}</p>
+          <p className="text-sm">Итоговый: <b>{testScore}</b>/{testQueue.length || 6}</p>
+        </div>
+        <button onClick={onBack} className="mt-4 px-8 py-3 bg-primary text-white rounded-xl font-bold">К модулям</button>
       </motion.div>
     </div>
   );
