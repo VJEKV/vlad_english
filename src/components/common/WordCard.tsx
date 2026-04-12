@@ -175,6 +175,67 @@ const WORD_DICT: Record<string, { ru: string; emoji: string }> = {
   // Misc
   birthday: { ru: 'день рождения', emoji: '🎂' }, party: { ru: 'вечеринка', emoji: '🎉' }, present: { ru: 'подарок', emoji: '🎁' },
   circus: { ru: 'цирк', emoji: '🎪' }, zoo: { ru: 'зоопарк', emoji: '🦁' }, shop: { ru: 'магазин', emoji: '🏪' },
+  // Days of the week
+  monday: { ru: 'понедельник', emoji: '📅' }, tuesday: { ru: 'вторник', emoji: '📅' },
+  wednesday: { ru: 'среда', emoji: '📅' }, thursday: { ru: 'четверг', emoji: '📅' },
+  friday: { ru: 'пятница', emoji: '📅' }, saturday: { ru: 'суббота', emoji: '📅' },
+  sunday: { ru: 'воскресенье', emoji: '📅' }, weekend: { ru: 'выходные', emoji: '🌟' },
+  // School subjects & items
+  art: { ru: 'рисование', emoji: '🎨' }, maths: { ru: 'математика', emoji: '🔢' },
+  pe: { ru: 'физкультура', emoji: '⛹️' }, music: { ru: 'музыка', emoji: '🎵' },
+  english: { ru: 'английский', emoji: '🇬🇧' }, subject: { ru: 'предмет', emoji: '📚' },
+  eraser: { ru: 'ластик', emoji: '🧹' }, marker: { ru: 'маркер', emoji: '🖊️' },
+  board: { ru: 'доска', emoji: '📋' }, homework: { ru: 'дом. задание', emoji: '📚' },
+  classroom: { ru: 'класс', emoji: '🏫' }, pupils: { ru: 'ученики', emoji: '👨‍🎓' },
+  computer: { ru: 'компьютер', emoji: '💻' },
+  // Locations & rooms
+  room: { ru: 'комната', emoji: '🚪' }, garage: { ru: 'гараж', emoji: '🚗' },
+  upstairs: { ru: 'наверху', emoji: '⬆️' }, downstairs: { ru: 'внизу', emoji: '⬇️' },
+  inside: { ru: 'внутри', emoji: '🏠' }, town: { ru: 'город', emoji: '🏘️' },
+  city: { ru: 'город', emoji: '🏙️' }, country: { ru: 'страна', emoji: '🗺️' },
+  capital: { ru: 'столица', emoji: '🏛️' }, place: { ru: 'место', emoji: '📍' },
+  pool: { ru: 'бассейн', emoji: '🏊' }, camp: { ru: 'лагерь', emoji: '⛺' },
+  front: { ru: 'перед', emoji: '👀' },
+  // Food & meals
+  breakfast: { ru: 'завтрак', emoji: '🍳' }, lunch: { ru: 'обед', emoji: '🍴' },
+  dinner: { ru: 'ужин', emoji: '🍽️' }, tea: { ru: 'чай', emoji: '☕' },
+  // Animals extra
+  mouse: { ru: 'мышь', emoji: '🐭' }, tail: { ru: 'хвост', emoji: '🐈' },
+  paws: { ru: 'лапы', emoji: '🐾' }, wings: { ru: 'крылья', emoji: '🦅' },
+  beak: { ru: 'клюв', emoji: '🦜' }, feathers: { ru: 'перья', emoji: '🪶' },
+  fur: { ru: 'мех', emoji: '🧶' }, furry: { ru: 'пушистый', emoji: '🐾' },
+  pets: { ru: 'питомцы', emoji: '🐾' }, animals: { ru: 'животные', emoji: '🦁' },
+  // Clothes extra
+  shirt: { ru: 'рубашка', emoji: '👕' },
+  // Activities
+  ride: { ru: 'кататься', emoji: '🚴' }, juggle: { ru: 'жонглировать', emoji: '🤹' },
+  clap: { ru: 'хлопать', emoji: '👏' }, stamp: { ru: 'топать', emoji: '👣' },
+  touch: { ru: 'трогать', emoji: '👆' }, count: { ru: 'считать', emoji: '🔢' },
+  wake: { ru: 'просыпаться', emoji: '⏰' }, shower: { ru: 'душ', emoji: '🚿' },
+  bath: { ru: 'ванна', emoji: '🛁' }, swimming: { ru: 'плавание', emoji: '🏊' },
+  football: { ru: 'футбол', emoji: '⚽' }, basketball: { ru: 'баскетбол', emoji: '🏀' },
+  // Descriptors
+  amazing: { ru: 'удивительный', emoji: '🤩' }, tiny: { ru: 'крошечный', emoji: '🤏' },
+  sweet: { ru: 'сладкий', emoji: '🍭' }, popular: { ru: 'популярный', emoji: '⭐' },
+  shabby: { ru: 'потёртый', emoji: '🏚️' }, colourful: { ru: 'разноцветный', emoji: '🌈' },
+  colour: { ru: 'цвет', emoji: '🎨' }, colours: { ru: 'цвета', emoji: '🎨' },
+  // General words
+  name: { ru: 'имя', emoji: '📝' }, people: { ru: 'люди', emoji: '👥' },
+  everyone: { ru: 'все', emoji: '👥' }, together: { ru: 'вместе', emoji: '🤝' },
+  fun: { ru: 'весело', emoji: '🎉' }, things: { ru: 'вещи', emoji: '📦' },
+  clothes: { ru: 'одежда', emoji: '👕' }, box: { ru: 'коробка', emoji: '📦' },
+  bag: { ru: 'портфель', emoji: '🎒' }, letters: { ru: 'буквы', emoji: '📮' },
+  numbers: { ru: 'цифры', emoji: '🔢' }, cartoons: { ru: 'мультфильмы', emoji: '📺' },
+  tv: { ru: 'телевизор', emoji: '📺' }, telephone: { ru: 'телефон', emoji: '☎️' },
+  tricks: { ru: 'трюки', emoji: '🎭' }, hello: { ru: 'привет', emoji: '👋' },
+  alright: { ru: 'хорошо', emoji: '👌' }, oh: { ru: 'о!', emoji: '😮' },
+  done: { ru: 'готово', emoji: '✅' }, bit: { ru: 'немного', emoji: '🤏' },
+  lot: { ru: 'много', emoji: '📦' }, half: { ru: 'половина', emoji: '➗' },
+  quarter: { ru: 'четверть', emoji: '🕐' }, past: { ru: 'после', emoji: '⏱️' },
+  mrs: { ru: 'миссис', emoji: '👩' }, living: { ru: 'жилой', emoji: '🛋️' },
+  dining: { ru: 'столовая', emoji: '🍽️' }, because: { ru: 'потому что', emoji: '💡' },
+  especially: { ru: 'особенно', emoji: '⭐' }, years: { ru: 'лет', emoji: '📆' },
+  days: { ru: 'дни', emoji: '📅' }, uk: { ru: 'Великобритания', emoji: '🇬🇧' },
 };
 
 // Lookup word in dictionary (handles plural forms, contractions, etc.)

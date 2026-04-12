@@ -182,10 +182,10 @@ export default function SentenceReader({
 
               return (
                 <span key={wi}>
-                  <span onClick={() => clickWord(clean, wi)}
+                  <WordWithCard word={clean} onClick={() => clickWord(clean, wi)}
                     className={`cursor-pointer rounded px-0.5 transition-all duration-200 ${
                       isWordActive ? 'bg-success text-white' : 'hover:text-primary hover:bg-primary/5'
-                    }`}>{token}</span>
+                    }`}>{token}</WordWithCard>
                   <span> </span>
                 </span>
               );
