@@ -198,16 +198,38 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
   useEffect(() => {
     if (phase !== 'read' || !window.electronAPI?.ai || texts.length === 0) return;
     const allLines = texts.flatMap((t, ti) => t.lines.map((l, li) => ({ key: `${ti}-${li}`, text: parseLine(l)?.text || l })));
-    const batch = allLines.map(l => l.text).join('\n');
-    window.electronAPI.ai.chat([{ role: 'user', content: `Переведи каждую строку на русский. Только перевод, по одному на строку.\n${batch}` }], '')
-      .then(r => {
-        if (r.content) {
-          const ls = r.content.split('\n').filter((l: string) => l.trim());
-          const map: Record<string, string> = {};
-          allLines.forEach((item, i) => { if (ls[i]) map[item.key] = ls[i].trim(); });
-          setTranslations(map);
-        }
-      }).catch(() => {});
+
+    // Split into batches of 10 lines to avoid truncation
+    const batchSize = 10;
+    const batches: typeof allLines[] = [];
+    for (let i = 0; i < allLines.length; i += batchSize) {
+      batches.push(allLines.slice(i, i + batchSize));
+    }
+
+    const map: Record<string, string> = {};
+    (async () => {
+      for (const batch of batches) {
+        const batchText = batch.map((l, i) => `${i + 1}. ${l.text}`).join('\n');
+        try {
+          const r = await window.electronAPI!.ai.chat([{
+            role: 'user',
+            content: `Переведи каждую строку на русский. Только перевод, по одному на строку, с номером. Без пояснений.\n${batchText}`
+          }], '');
+          if (r.content) {
+            const ls = r.content.split('\n').filter((l: string) => l.trim());
+            batch.forEach((item, i) => {
+              let tr = ls[i]?.trim();
+              if (tr) {
+                // Remove leading number like "1. " or "1) "
+                tr = tr.replace(/^\d+[\.\)]\s*/, '');
+                map[item.key] = tr;
+              }
+            });
+          }
+        } catch {}
+      }
+      setTranslations({ ...map });
+    })();
   }, [phase]);
 
   // Dialogue test state
@@ -216,10 +238,11 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
   const [dtSel, setDtSel] = useState<number | null>(null);
   const [dtFb, setDtFb] = useState<'correct' | 'wrong' | null>(null);
   const [dtScore, setDtScore] = useState(0);
+  const [dtReady, setDtReady] = useState(false);
   const dtInitialized = useRef(false);
 
   useEffect(() => {
-    if (phase !== 'dialogueTest') { dtInitialized.current = false; return; }
+    if (phase !== 'dialogueTest') { dtInitialized.current = false; setDtReady(false); return; }
     if (!dtInitialized.current) {
       const qs = generateDialogueQuestions(module);
       setDtQuestions(qs);
@@ -228,6 +251,11 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
       setDtSel(null);
       setDtFb(null);
       dtInitialized.current = true;
+      setDtReady(true);
+      // If no questions generated, auto-skip to grammar
+      if (qs.length === 0) {
+        setTimeout(() => setPhase('grammar'), 50);
+      }
     }
   }, [phase]);
 
@@ -405,13 +433,21 @@ export default function SpotlightLesson({ module, onComplete, onBack, onPhaseCha
 
   // ===== DIALOGUE TEST — right after reading =====
   if (phase === 'dialogueTest') {
-    if (dtQuestions.length === 0) {
-      // No questions generated — skip to grammar
+    // Wait for useEffect to initialize questions
+    if (!dtReady) {
       return (
         <div className="text-center py-8">
           <Loader2 size={24} className="animate-spin text-primary mx-auto" />
-          {/* Auto-skip after init */}
-          {dtInitialized.current && setTimeout(() => setPhase('grammar'), 100) && null}
+          <p className="text-sm text-gray-400 mt-2">Готовим тест...</p>
+        </div>
+      );
+    }
+    // If no questions could be generated, skip to grammar via effect
+    if (dtQuestions.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-gray-400">Переходим к грамматике...</p>
+          {/* Skip effect */}
         </div>
       );
     }

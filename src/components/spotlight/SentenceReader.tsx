@@ -28,8 +28,7 @@ function WordWithCard({ children, word, className, onClick }: {
           <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
             className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 p-2 min-w-[110px] text-center pointer-events-none">
             <span className="text-3xl block">{info.emoji}</span>
-            <p className="font-bold text-xs">{word}</p>
-            <p className="text-xs text-gray-600">{info.ru}</p>
+            <p className="text-sm font-bold text-gray-700">{info.ru}</p>
           </motion.div>
         )}
       </AnimatePresence>
